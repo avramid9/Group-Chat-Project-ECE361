@@ -5,7 +5,7 @@
 #include <netdb.h>
 
 int main(int argc, char *argv[]){
-    printf("Hello world\n");
+    //I THINK THIS SHOULD BE ARGV[1] - ANDREAS
     server(argv[0]);
     
     
