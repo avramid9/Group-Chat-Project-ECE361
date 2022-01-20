@@ -19,7 +19,6 @@ int main(int argc, char *argv[]){
     //Get arguments
     int port = atoi(argv[2]);
     char *ipAddress = argv[1];
-    printf(ipAddress);
 
     char fileLoc[100];
     char ftpCheck[10];
