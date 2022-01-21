@@ -61,7 +61,7 @@ int server(char *port_num){
     
     
     //respond to client
-    if(buf=="ftp"){
+    if(strcmp(buf, "ftp") == 0){
         //return yes to client
         char message [4] = "yes";
         if((bytes_sent = sendto(socket1,message,sizeof(message),0,(struct sockaddr *)&deliver_addr, addr_len))==-1){
