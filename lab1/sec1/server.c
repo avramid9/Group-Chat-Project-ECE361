@@ -3,16 +3,19 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include <string.h>
+
+int server(char *port_num);
 
 int main(int argc, char *argv[]){
-    //I THINK THIS SHOULD BE ARGV[1] - ANDREAS
-    server(argv[0]);
+    
+    server(argv[1]);
     
     
     return 0;
 }
 
-int server(int port_num){
+int server(char *port_num){
     int socket1 = socket(AF_INET,SOCK_DGRAM,0);
     
     struct sockaddr_storage deliver_addr;  //this will save the ip address of client
@@ -38,7 +41,7 @@ int server(int port_num){
     
     if(bind(socket1, servinfo->ai_addr, servinfo->ai_addrlen) == -1){
         //fail to bind
-        close(socket1);
+        //close(socket1);
         printf("failed to bind socket");
         return -1;
     }
@@ -61,7 +64,7 @@ int server(int port_num){
     if(buf=="ftp"){
         //return yes to client
         char message [4] = "yes";
-        if((bytes_sent = sendto(socket1,message,sizeof(message),0,(struct sockaddr *)&deliver_addr, &addr_len))==-1){
+        if((bytes_sent = sendto(socket1,message,sizeof(message),0,(struct sockaddr *)&deliver_addr, addr_len))==-1){
             //response to client failed
             printf("listener:sendto failed");
             return -1;
@@ -71,7 +74,7 @@ int server(int port_num){
     else{
         //return no to client
         char message [3] = "no";
-        if((bytes_sent = sendto(socket1,message,sizeof(message),0,(struct sockaddr *)&deliver_addr, &addr_len))==-1){
+        if((bytes_sent = sendto(socket1,message,sizeof(message),0,(struct sockaddr *)&deliver_addr, addr_len))==-1){
             //response to client failed
             printf("listener:sendto failed");
             return -1;
