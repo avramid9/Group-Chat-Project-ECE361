@@ -3,6 +3,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include <unistd.h>
 #include <string.h>
 
 int server(char *port_num);
@@ -45,8 +46,6 @@ int server(char *port_num){
         printf("failed to bind socket");
         return -1;
     }
-    
-    freeaddrinfo(servinfo);
     
     //server is set up and listening at port port_num...
     printf("listener: waiting to recvfrom...\n");
