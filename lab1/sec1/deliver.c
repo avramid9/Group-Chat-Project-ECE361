@@ -71,7 +71,7 @@ int main(int argc, char *argv[]){
         exit(1);
     }
 
-    printf("A file transfer can start.");
+    printf("A file transfer can start.\n");
     close(socketFD);
     return 0;
 }
