@@ -20,7 +20,7 @@ struct packet {
 
 char* packet_to_single(struct packet p){
     //idk how to concatenate without using string functions ree
-    char* k = p.total_frag + ":" + p.frag_no + ":" + p.size + ":" + p.filename + ":" + p.filedata;
+    char* k = p.total_frag + ":" + p.frag_no + ":" + p.size + ":" + *p.filename + ":" + p.filedata;
     return k;
 }
 
@@ -73,12 +73,12 @@ int main(int argc, char *argv[]){
     ssize_t reader;
     if((fd_from=open(fileLoc, O_RDONLY))<0)
         printf("error reading file");   
-    while((reader=read(fd_from,temp_data,sizeof(temp_data)))>0){ 
+    while((reader=read(fd_from,packet_array[frag_no].filedata,sizeof(packet_array[frag_no].filedata)))>0){ 
         packet_array[frag_no].total_frag = total_frag;
         packet_array[frag_no].frag_no = frag_no;
         packet_array[frag_no].filename = fileLoc;
         packet_array[frag_no].size = size;
-        packet_array[frag_no].filedata = temp_data;
+
         
         //increment fragment number
         frag_no++;
