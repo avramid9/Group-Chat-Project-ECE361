@@ -10,6 +10,7 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+
 struct packet {  
     unsigned int total_frag;  
     unsigned int frag_no; 
@@ -18,12 +19,66 @@ struct packet {
     char filedata[1000];  
 };
 
-char* packet_to_single(struct packet p){
-    //idk how to concatenate without using string functions ree
-    char* k = p.total_frag + ":" + p.frag_no + ":" + p.size + ":" + *p.filename + ":" + p.filedata;
-    return k;
-}
+char* packet_to_message(struct packet p, int* message_len){
+    //Get strings and their length from first 3 fields in packet
+    int total_frag_len = snprintf(NULL, 0, "%d", p.total_frag);
+    char* total_frag = malloc(total_frag_len + 1);
+    snprintf(total_frag, total_frag_len+1, "%d", p.total_frag);
 
+    int frag_no_len = snprintf(NULL, 0, "%d", p.frag_no);
+    char* frag_no = malloc(frag_no_len + 1);
+    snprintf(frag_no, frag_no_len+1, "%d", p.frag_no);
+
+    int size_len = snprintf(NULL, 0, "%d", p.size);
+    char* size = malloc(size_len + 1);
+    snprintf(size, size_len+1, "%d", p.size);
+    
+    //Allocate char array for the message which will be returned as a pointer
+    int mSize = 4 + total_frag_len + frag_no_len + size_len + strlen(p.filename) + p.size; 
+    char *m = malloc(mSize);
+    char test = (char) p.total_frag;
+
+    //Keep track of position each time we add a string to the message
+    int mPos = 0;
+
+    //Add first three variables to message
+    for(int i = mPos; i < (mPos + total_frag_len); i++){
+        m[i] = total_frag[i-mPos];
+    }
+    m[mPos + total_frag_len] = ':';
+    mPos += total_frag_len+1;
+
+    for(int i = mPos; i < (mPos + frag_no_len); i++){
+        m[i] = frag_no[i-mPos];
+    }
+    m[mPos + frag_no_len] = ':';
+    mPos += frag_no_len+1;
+
+    for(int i = mPos; i < (mPos + size_len); i++){
+        m[i] = size[i-mPos];
+    }
+    m[mPos + size_len] = ':';
+    mPos += size_len+1;
+
+    //Add filename to message
+    for(int i = mPos; i < mPos+strlen(p.filename); i++){
+        m[i] = p.filename[i-mPos];
+    }
+    m[mPos + strlen(p.filename)] = ':';
+    mPos += strlen(p.filename)+1;
+
+    //Add file data to message
+    for(int i = mPos; i < mSize; i++){
+        m[i] = p.filedata[i-mPos];
+    }
+
+    free(total_frag);
+    free(frag_no);
+    free(size);
+    
+    *message_len = mSize;
+    return m;
+}
 
 int main(int argc, char *argv[]){
     int socketFD = socket(AF_INET,SOCK_DGRAM,0);

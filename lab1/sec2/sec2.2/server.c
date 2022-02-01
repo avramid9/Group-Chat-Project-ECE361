@@ -14,12 +14,73 @@ struct packet {
     unsigned int size; 
     char* filename; 
     char filedata[1000];  
-} packet;
+};
+
+struct packet message_to_packet(char* m){
+    struct packet p;
+    
+    //Get total_frag
+    int start = 0;
+    int end = 0;
+    char val = m[end];
+    while(val != ':'){
+        end++;
+        val = m[end];
+    }
+    char total_frag[end-start+1];
+    memcpy(total_frag, &m[start], end);
+    total_frag[end-start] = '\0';
+    p.total_frag = atoi(total_frag);
+    end++;
+    start = end;
+    
+    //Get frag_no
+    val = m[end];
+    while(val != ':'){
+        end++;
+        val = m[end];
+    }
+    char frag_no[end-start+1];
+    memcpy(frag_no, &m[start], end);
+    frag_no[end-start] = '\0';
+    p.frag_no = atoi(frag_no);
+    end++;
+    start = end;
+    
+    //Get size
+    val = m[end];
+    while(val != ':'){
+        end++;
+        val = m[end];
+    }
+    char size[end-start+1];
+    memcpy(size, &m[start], end);
+    size[end-start] = '\0';
+    p.size = atoi(size);
+    end++;
+    start = end;
+    
+    //Get filename
+    val = m[end];
+    while(val != ':'){
+        end++;
+        val = m[end];
+    }
+    p.filename = malloc(end-start+1);
+    strncpy(p.filename, &m[start], end);
+    p.filename[end-start] = '\0';
+    end++;
+    start = end;
+    
+    //Get filedata
+    memcpy(p.filedata, &m[start], p.size);
+    
+    return p;
+}
 
 int main(int argc, char *argv[]){
     
     server(argv[1]);
-    
     
     return 0;
 }
