@@ -46,8 +46,6 @@ int main(int argc, char *argv[]){
     sa.sin_port = htons(port);
     inet_pton(AF_INET, ipAddress, &(sa.sin_addr));
 
-    //get time to check round trip time
-    //time_t begin=time(NULL);
     struct timespec ts;
     int get_time = clock_gettime(CLOCK_REALTIME, &ts);
 
@@ -76,8 +74,6 @@ int main(int argc, char *argv[]){
         exit(1);
     }
 
-    //time_t end = time(NULL);
-    //double round_trip = difftime(end,begin);
     printf("Round trip time is: %ld nano seconds\n",ts.tv_nsec);
 
     printf("A file transfer can start.\n");
