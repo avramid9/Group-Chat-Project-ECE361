@@ -5,7 +5,8 @@
 #include <netdb.h>
 #include <unistd.h>
 #include <string.h>
-
+#include <fcntl.h>
+#include <dirent.h>
 int server(char *port_num);
 
 struct packet {  
@@ -92,7 +93,7 @@ int server(char *port_num){
     socklen_t addr_len;
     int bytes_sent;
     int bytes_received;
-    char buf[5];
+    char buf[4000];
     //code used in Beej's Guide to aqcuire IP
     int status;
     struct addrinfo hints;
@@ -120,33 +121,63 @@ int server(char *port_num){
     printf("listener: waiting to recvfrom...\n");
     
     addr_len = sizeof(deliver_addr); 
-    if((bytes_received = recvfrom(socket1, buf, sizeof(buf) , 0, (struct sockaddr *)&deliver_addr, &addr_len)) == -1){
+    if((bytes_received = recvfrom(socket1, buf, sizeof(buf), 0, (struct sockaddr *)&deliver_addr, &addr_len)) == -1){
         //receive failed
-        printf("listener:recvfrom failed");
+        printf("first listener:recvfrom failed");
         return -1;
     }
-    buf[bytes_received]='\0';
     
+    
+    struct packet first_packet = message_to_packet(buf);
+    
+    int fd;
+    mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
+    
+    DIR* dir=opendir("received");
+    
+    
+    if(fd=creat(first_packet.filename,mode)<0){
+        printf("error creating file");
+    }
+    
+    ssize_t writer;
+    if((writer=write(fd,first_packet.filedata,first_packet.size))<0)
+        printf("error writing file");
+    
+    char ack [10] = "yes";
+    if((bytes_sent = sendto(socket1,ack,sizeof(ack),0,(struct sockaddr *)&deliver_addr, addr_len))==-1){
+        //response to client failed
+        printf("listener:sendto failed");
+        return -1;
+    }
+    
+    for(int i=2; i<=first_packet.total_frag; i++){
+       
+        if((bytes_received = recvfrom(socket1, buf, sizeof(buf), 0, (struct sockaddr *)&deliver_addr, &addr_len)) == -1){
+            //receive failed
+            printf("listener:recvfrom failed");
+            return -1;
+        }
+        struct packet p = message_to_packet(buf);
+        if((writer=write(fd,p.filedata,p.size))<0)
+            printf("error writing file");
+        
+        //char num_return[10] = p.frag_no;
+        if((bytes_sent = sendto(socket1,ack,sizeof(ack),0,(struct sockaddr *)&deliver_addr, addr_len))==-1){
+            //response to client failed
+            printf("listener:sendto failed");
+            return -1;
+        }
+    }
+    close(fd);
+    closedir(dir);
     
     //respond to client
-    if(strcmp(buf, "ftp") == 0){
-        //return yes to client
-        char message [4] = "yes";
-        if((bytes_sent = sendto(socket1,message,sizeof(message),0,(struct sockaddr *)&deliver_addr, addr_len))==-1){
-            //response to client failed
-            printf("listener:sendto failed");
-            return -1;
-        }
-        
-    }
-    else{
-        //return no to client
-        char message [3] = "no";
-        if((bytes_sent = sendto(socket1,message,sizeof(message),0,(struct sockaddr *)&deliver_addr, addr_len))==-1){
-            //response to client failed
-            printf("listener:sendto failed");
-            return -1;
-        }
+    char message_return [10] = "completed";
+    if((bytes_sent = sendto(socket1,message_return,sizeof(message_return),0,(struct sockaddr *)&deliver_addr, addr_len))==-1){
+        //response to client failed
+        printf("listener:sendto failed");
+        return -1;
     }
     
     //done

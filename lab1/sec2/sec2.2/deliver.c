@@ -115,7 +115,7 @@ int main(int argc, char *argv[]){
     //check file size first
     struct stat st;
     stat(fileLoc, &st);
-    int size = st.st_size;
+    
     
     int total_frag = st.st_size/1000+1;
     int frag_no=1;
@@ -123,16 +123,19 @@ int main(int argc, char *argv[]){
     struct packet packet_array[100]; //used to store packets we need to send
     char temp_data[1000];
     
-    int fd_from;
-    
+    int fd_from;  
     ssize_t reader;
-    if((fd_from=open(fileLoc, O_RDONLY))<0)
+    
+    if((fd_from=open(fileLoc, O_RDWR))<0)
         printf("error reading file");   
-    while((reader=read(fd_from,packet_array[frag_no].filedata,sizeof(packet_array[frag_no].filedata)))>0){ 
+    while((reader=read(fd_from,packet_array[frag_no].filedata,1000))>0){ 
         packet_array[frag_no].total_frag = total_frag;
         packet_array[frag_no].frag_no = frag_no;
         packet_array[frag_no].filename = fileLoc;
-        packet_array[frag_no].size = size;
+        if(frag_no!=total_frag)
+            packet_array[frag_no].size = 1000;
+        else
+            packet_array[frag_no].size = st.st_size%1000;
 
         
         //increment fragment number
@@ -156,21 +159,30 @@ int main(int argc, char *argv[]){
     
     //continue ...
     
-    /*
+    
     //Send ftp message to server
-    if((bytesSent = sendto(socketFD, "ftp", sizeof("ftp"), 0, (struct sockaddr *) &sa, sizeof(sa))) == -1){
-        printf("Error sending message to server\n");
-        exit(1);
-    }
-    
-    
-
     struct sockaddr_storage sa_stor;
     socklen_t sa_stor_size = sizeof(sa_stor);
     ssize_t bytesReceived;
 
     int bufLen = 10;
     char buf[bufLen];
+    
+    for(int i=1; i<=frag_no;i++){
+        int length;
+        char* message_s = packet_to_message(packet_array[i],&length);
+        if((bytesSent = sendto(socketFD, message_s, length, 0, (struct sockaddr *) &sa, sizeof(sa))) == -1){
+            printf("Error sending message to server\n");
+            exit(1);
+        }
+        
+        if((bytesReceived = recvfrom(socketFD, buf, bufLen, 0, (struct sockaddr *) &sa_stor, &sa_stor_size)) == -1){
+            printf("Error receiving message from server");
+            exit(1);
+        }
+        
+    }
+    
 
     //Receive message from server
     if((bytesReceived = recvfrom(socketFD, buf, bufLen, 0, (struct sockaddr *) &sa_stor, &sa_stor_size)) == -1){
@@ -180,12 +192,12 @@ int main(int argc, char *argv[]){
     
     
     //Check return message from server
-    if(strcmp(buf, "yes") != 0){
+    if(strcmp(buf, "completed") != 0){
         exit(1);
     }
 
-    printf("A file transfer can start.\n");
+    printf("File transfer completed\n");
     close(socketFD);
-     */
+     
     return 0;
 }
