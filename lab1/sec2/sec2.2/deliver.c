@@ -120,18 +120,25 @@ int main(int argc, char *argv[]){
     int total_frag = st.st_size/1000+1;
     int frag_no=1;
     
-    struct packet packet_array[100]; //used to store packets we need to send
+    struct packet packet_array[7000]; //used to store packets we need to send
     char temp_data[1000];
     
     int fd_from;  
-    ssize_t reader;
+    size_t reader;
     
-    if((fd_from=open(fileLoc, O_RDWR))<0)
-        printf("error reading file");   
-    while((reader=read(fd_from,packet_array[frag_no].filedata,1000))>0){ 
+    FILE * fp;
+    fp = fopen(fileLoc, "rb");
+    
+    
+    //if((fd_from=open(fileLoc, O_RDONLY))<0)
+      //  printf("error reading file");   
+    while((reader=fread(packet_array[frag_no].filedata,1,1000,fp))>0 && frag_no<=total_frag){ 
         packet_array[frag_no].total_frag = total_frag;
         packet_array[frag_no].frag_no = frag_no;
-        packet_array[frag_no].filename = fileLoc;
+
+        packet_array[frag_no].filename = malloc(sizeof(fileLoc));
+        strcpy(packet_array[frag_no].filename,fileLoc);
+        printf("filename %s\n",packet_array[frag_no].filename);
         if(frag_no!=total_frag)
             packet_array[frag_no].size = 1000;
         else
@@ -143,7 +150,7 @@ int main(int argc, char *argv[]){
     }
     
     //close file since we're done reading
-    if(close(fd_from)<0)
+    if(fclose(fp)<0)
         printf("error closing file");
     
     
@@ -168,19 +175,19 @@ int main(int argc, char *argv[]){
     int bufLen = 10;
     char buf[bufLen];
     
-    for(int i=1; i<=frag_no;i++){
+    for(int i=1; i<frag_no;i++){
         int length;
         char* message_s = packet_to_message(packet_array[i],&length);
         if((bytesSent = sendto(socketFD, message_s, length, 0, (struct sockaddr *) &sa, sizeof(sa))) == -1){
             printf("Error sending message to server\n");
             exit(1);
         }
-        
+        printf("waiting for ack\n");
         if((bytesReceived = recvfrom(socketFD, buf, bufLen, 0, (struct sockaddr *) &sa_stor, &sa_stor_size)) == -1){
             printf("Error receiving message from server");
             exit(1);
         }
-        
+        printf("ack received");
     }
     
 
@@ -198,6 +205,7 @@ int main(int argc, char *argv[]){
 
     printf("File transfer completed\n");
     close(socketFD);
-     
+    
+    
     return 0;
 }

@@ -127,21 +127,29 @@ int server(char *port_num){
         return -1;
     }
     
-    
+    printf("received first packet");
     struct packet first_packet = message_to_packet(buf);
-    
+    printf("filedata: %s",first_packet.filedata);
     int fd;
-    mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
-    
+    mode_t mode = S_IRUSR | S_IWUSR;
+    /*
     DIR* dir=opendir("received");
+    if(dir==NULL)
+        printf("error opening folder");
+    */ 
     
-    
-    if(fd=creat(first_packet.filename,mode)<0){
+    char path[100]="received/";
+    strcat(path,first_packet.filename);
+    /*
+    if(fd=creat(path,mode)<0){
         printf("error creating file");
     }
+     */
+    FILE *fp = fopen(path,"ab");
     
-    ssize_t writer;
-    if((writer=write(fd,first_packet.filedata,first_packet.size))<0)
+    
+    size_t writer;
+    if((writer=fwrite(first_packet.filedata,1,first_packet.size,fp))<0)
         printf("error writing file");
     
     char ack [10] = "yes";
@@ -152,14 +160,14 @@ int server(char *port_num){
     }
     
     for(int i=2; i<=first_packet.total_frag; i++){
-       
+      
         if((bytes_received = recvfrom(socket1, buf, sizeof(buf), 0, (struct sockaddr *)&deliver_addr, &addr_len)) == -1){
             //receive failed
             printf("listener:recvfrom failed");
             return -1;
         }
         struct packet p = message_to_packet(buf);
-        if((writer=write(fd,p.filedata,p.size))<0)
+        if((writer=fwrite(p.filedata,1,p.size,fp))<0)
             printf("error writing file");
         
         //char num_return[10] = p.frag_no;
@@ -169,8 +177,8 @@ int server(char *port_num){
             return -1;
         }
     }
-    close(fd);
-    closedir(dir);
+    fclose(fp);
+    //closedir(dir);
     
     //respond to client
     char message_return [10] = "completed";
