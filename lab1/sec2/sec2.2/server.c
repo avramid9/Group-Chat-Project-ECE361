@@ -127,24 +127,16 @@ int server(char *port_num){
         return -1;
     }
     
-    printf("received first packet");
+    
     struct packet first_packet = message_to_packet(buf);
-    printf("filedata: %s",first_packet.filedata);
+    
     int fd;
-    mode_t mode = S_IRUSR | S_IWUSR;
-    /*
-    DIR* dir=opendir("received");
-    if(dir==NULL)
-        printf("error opening folder");
-    */ 
+    
+    
     
     char path[100]="received/";
     strcat(path,first_packet.filename);
-    /*
-    if(fd=creat(path,mode)<0){
-        printf("error creating file");
-    }
-     */
+    
     FILE *fp = fopen(path,"ab");
     
     
@@ -170,7 +162,7 @@ int server(char *port_num){
         if((writer=fwrite(p.filedata,1,p.size,fp))<0)
             printf("error writing file");
         
-        //char num_return[10] = p.frag_no;
+        
         if((bytes_sent = sendto(socket1,ack,sizeof(ack),0,(struct sockaddr *)&deliver_addr, addr_len))==-1){
             //response to client failed
             printf("listener:sendto failed");
@@ -178,7 +170,7 @@ int server(char *port_num){
         }
     }
     fclose(fp);
-    //closedir(dir);
+    
     
     //respond to client
     char message_return [10] = "completed";
