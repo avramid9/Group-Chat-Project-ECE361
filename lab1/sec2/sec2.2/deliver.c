@@ -187,7 +187,7 @@ int main(int argc, char *argv[]){
             printf("Error receiving message from server");
             exit(1);
         }
-        printf("ack received");
+        printf("ack received\n");
     }
     
 
