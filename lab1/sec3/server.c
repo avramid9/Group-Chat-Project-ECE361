@@ -120,7 +120,24 @@ int server(char *port_num){
     //server is set up and listening at port port_num...
     printf("listener: waiting to recvfrom...\n");
     
+    //////////////////////////////////////////////////
+    //listening for RTT packet
     addr_len = sizeof(deliver_addr); 
+    if((bytes_received = recvfrom(socket1, buf, sizeof(buf), 0, (struct sockaddr *)&deliver_addr, &addr_len)) == -1){
+        //receive failed
+        printf("first listener:recvfrom failed");
+        return -1;
+    }
+    else{
+        if((bytes_sent = sendto(socket1,"first",sizeof("first"),0,(struct sockaddr *)&deliver_addr, addr_len))==-1){
+            //response to client failed
+            printf("listener:sendto failed");
+            return -1;
+        }
+    }
+    /////////////////////////////////////////////////////////
+    
+    //begin file transfer
     if((bytes_received = recvfrom(socket1, buf, sizeof(buf), 0, (struct sockaddr *)&deliver_addr, &addr_len)) == -1){
         //receive failed
         printf("first listener:recvfrom failed");

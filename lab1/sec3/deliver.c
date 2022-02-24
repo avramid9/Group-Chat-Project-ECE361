@@ -164,13 +164,35 @@ int main(int argc, char *argv[]){
 
     ssize_t bytesSent;
     
-    //continue ...
+    //////////////////////////////////////////////////////////
+    //calculate RTT
+    struct timespec ts;
+    int get_time = clock_gettime(CLOCK_REALTIME, &ts);
+
+    ssize_t firstBytesSent;
+    //Send first message to server
+    if((firstBytesSent = sendto(socketFD, "first", sizeof("first"), 0, (struct sockaddr *) &sa, sizeof(sa))) == -1){
+        printf("Error sending message to server\n");
+        exit(1);
+    }
     
-    
-    //Send ftp message to server
     struct sockaddr_storage sa_stor;
     socklen_t sa_stor_size = sizeof(sa_stor);
     ssize_t bytesReceived;
+    
+    
+    //Receive message from server
+    if((bytesReceived = recvfrom(socketFD, buf, bufLen, 0, (struct sockaddr *) &sa_stor, &sa_stor_size)) == -1){
+        printf("Error receiving message from server");
+        exit(1);
+    }
+    //RTT is recorded here
+    double RTT = ts.tv_nsec;
+    //end of calculating RTT
+    /////////////////////////////////////////////////////////////////
+    
+    
+    
 
     int bufLen = 10;
     char buf[bufLen];
