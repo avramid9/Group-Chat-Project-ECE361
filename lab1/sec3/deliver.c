@@ -163,6 +163,9 @@ int main(int argc, char *argv[]){
     inet_pton(AF_INET, ipAddress, &(sa.sin_addr));
 
     ssize_t bytesSent;
+
+    int bufLen = 10;
+    char buf[bufLen];
     
     //////////////////////////////////////////////////////////
     //calculate RTT
@@ -194,8 +197,7 @@ int main(int argc, char *argv[]){
     
     
 
-    int bufLen = 10;
-    char buf[bufLen];
+    
     
     for(int i=1; i<frag_no;i++){
         int length;

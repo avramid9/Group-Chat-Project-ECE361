@@ -175,7 +175,7 @@ int server(char *port_num){
                 return -1;
             }
         
-        if (uniform_rand() > 1e-2) {
+        if (rand() % 100 > 10) {
             struct packet p = message_to_packet(buf);
             if((writer=fwrite(p.filedata,1,p.size,fp))<0)
                 printf("error writing file");
