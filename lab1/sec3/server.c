@@ -165,8 +165,8 @@ int server(char *port_num){
                 return -1;
         }
         
-        float rand = rand()/RAND_MAX; //simulate 1/100 drop
-        if (rand > 1e-2){           
+        float randNum = rand()/RAND_MAX; //simulate 1/100 drop
+        if (randNum > 1e-2){           
             struct packet p = message_to_packet(buf);
             
             //first time requires opening file

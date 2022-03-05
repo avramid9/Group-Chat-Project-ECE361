@@ -201,7 +201,7 @@ int main(int argc, char *argv[]){
     
 
     int index=1;
-    int bufLen = 10;
+    bufLen = 10;
 
     
     while(index<frag_no){
