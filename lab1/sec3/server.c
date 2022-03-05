@@ -169,21 +169,26 @@ int server(char *port_num){
     }
     
     for(int i=2; i<=first_packet.total_frag; i++){
-      
         if((bytes_received = recvfrom(socket1, buf, sizeof(buf), 0, (struct sockaddr *)&deliver_addr, &addr_len)) == -1){
-            //receive failed
-            printf("listener:recvfrom failed");
-            return -1;
+                //receive failed
+                printf("listener:recvfrom failed");
+                return -1;
+            }
+        
+        if (uniform_rand() > 1e-2) {
+            struct packet p = message_to_packet(buf);
+            if((writer=fwrite(p.filedata,1,p.size,fp))<0)
+                printf("error writing file");
+        
+        
+            if((bytes_sent = sendto(socket1,ack,sizeof(ack),0,(struct sockaddr *)&deliver_addr, addr_len))==-1){
+                //response to client failed
+                printf("listener:sendto failed");
+                return -1;
+            }
         }
-        struct packet p = message_to_packet(buf);
-        if((writer=fwrite(p.filedata,1,p.size,fp))<0)
-            printf("error writing file");
-        
-        
-        if((bytes_sent = sendto(socket1,ack,sizeof(ack),0,(struct sockaddr *)&deliver_addr, addr_len))==-1){
-            //response to client failed
-            printf("listener:sendto failed");
-            return -1;
+        else {
+            i--;
         }
     }
     fclose(fp);
