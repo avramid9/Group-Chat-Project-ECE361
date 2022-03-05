@@ -10,7 +10,8 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-
+#include <stdbool.h>
+#include <sys/time.h>
 struct packet {  
     unsigned int total_frag;  
     unsigned int frag_no; 
@@ -189,16 +190,47 @@ int main(int argc, char *argv[]){
         printf("Error receiving message from server");
         exit(1);
     }
-    //RTT is recorded here
-    double RTT = ts.tv_nsec;
-    //end of calculating RTT
+
+    //setup timer    using 3*RTT as timeout value
+    struct timeval  timeout;      
+    timeout.tv_sec = 3*ts.tv_sec;
+    timeout.tv_usec = 3*ts.tv_nsec*1000;
     /////////////////////////////////////////////////////////////////
     
     
     
 
+    int index=1;
+    int bufLen = 10;
+
     
-    
+    while(index<frag_no){
+        int length;   
+        char buf[bufLen]; 
+        char* message_s = packet_to_message(packet_array[index],&length);
+        
+        if((bytesSent = sendto(socketFD, message_s, length, 0, (struct sockaddr *) &sa, sizeof(sa))) == -1){
+            printf("Error sending message to server\n");
+            exit(1);
+        }
+        
+        //setup socket timeout
+        if (setsockopt(socketFD, SOL_SOCKET, SO_RCVTIMEO,&timeout,sizeof(timeout)) < 0) {
+            printf("error setting timeout");
+        }
+        
+        
+        if((bytesReceived = recvfrom(socketFD, buf, bufLen, 0, (struct sockaddr *) &sa_stor, &sa_stor_size)) == -1){
+            printf("Error receiving message from server");
+            exit(1);
+        }
+        
+        //check if buffer is empty, empty means lost ack
+        if(buf!=""){
+            index++; //not empty we move on to next packet
+        }
+    }
+    /*
     for(int i=1; i<frag_no;i++){
         int length;
         char* message_s = packet_to_message(packet_array[i],&length);
@@ -213,7 +245,7 @@ int main(int argc, char *argv[]){
         }
         printf("ack received\n");
     }
-    
+    */
 
     //Receive message from server
     if((bytesReceived = recvfrom(socketFD, buf, bufLen, 0, (struct sockaddr *) &sa_stor, &sa_stor_size)) == -1){

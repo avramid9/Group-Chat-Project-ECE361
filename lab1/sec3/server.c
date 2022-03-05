@@ -7,6 +7,7 @@
 #include <string.h>
 #include <fcntl.h>
 #include <dirent.h>
+#include <stdbool.h>
 int server(char *port_num);
 
 struct packet {  
@@ -138,26 +139,13 @@ int server(char *port_num){
     /////////////////////////////////////////////////////////
     
     //begin file transfer
-    if((bytes_received = recvfrom(socket1, buf, sizeof(buf), 0, (struct sockaddr *)&deliver_addr, &addr_len)) == -1){
-        //receive failed
-        printf("first listener:recvfrom failed");
-        return -1;
-    }
-    
-    
-    struct packet first_packet = message_to_packet(buf);
-    
-    int fd;
-    
-    
     
     char path[100]="received/";
-    strcat(path,first_packet.filename);
-    
-    FILE *fp = fopen(path,"ab");
-    
-    
+    //strcat(path,first_packet.filename);   
+    //FILE *fp = fopen(path,"ab");   
+    FILE *fp;
     size_t writer;
+    /*
     if((writer=fwrite(first_packet.filedata,1,first_packet.size,fp))<0)
         printf("error writing file");
     
@@ -167,30 +155,43 @@ int server(char *port_num){
         printf("listener:sendto failed");
         return -1;
     }
-    
-    for(int i=2; i<=first_packet.total_frag; i++){
+    */
+    int index = 1;
+    bool fin = false;
+    while(!fin){
         if((bytes_received = recvfrom(socket1, buf, sizeof(buf), 0, (struct sockaddr *)&deliver_addr, &addr_len)) == -1){
                 //receive failed
                 printf("listener:recvfrom failed");
                 return -1;
-            }
+        }
         
-        if (rand() % 100 > 10) {
+        float rand = rand()/RAND_MAX; //simulate 1/100 drop
+        if (rand > 1e-2){           
             struct packet p = message_to_packet(buf);
+            
+            //first time requires opening file
+            if(p.frag_no==1){
+                strcat(path,p.filename);
+                fp = fopen(path,"ab");
+            }
+            
+            
             if((writer=fwrite(p.filedata,1,p.size,fp))<0)
-                printf("error writing file");
-        
-        
+            printf("error writing file");
+    
+            char ack [10] = "yes";
             if((bytes_sent = sendto(socket1,ack,sizeof(ack),0,(struct sockaddr *)&deliver_addr, addr_len))==-1){
                 //response to client failed
                 printf("listener:sendto failed");
                 return -1;
             }
-        }
-        else {
-            i--;
+            
+            //check if it's the last segment
+            if(p.frag_no==p.total_frag)
+                fin=true;
         }
     }
+    
     fclose(fp);
     
     
