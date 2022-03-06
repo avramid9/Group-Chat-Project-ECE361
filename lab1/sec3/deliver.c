@@ -139,7 +139,7 @@ int main(int argc, char *argv[]){
 
         packet_array[frag_no].filename = malloc(sizeof(fileLoc));
         strcpy(packet_array[frag_no].filename,fileLoc);
-        printf("filename %s\n",packet_array[frag_no].filename);
+        //printf("filename %s, %d\n",packet_array[frag_no].filename, frag_no);
         if(frag_no!=total_frag)
             packet_array[frag_no].size = 1000;
         else
@@ -171,9 +171,10 @@ int main(int argc, char *argv[]){
     //////////////////////////////////////////////////////////
     //calculate RTT
     struct timespec ts;
-    int get_time = clock_gettime(CLOCK_REALTIME, &ts);
+    struct timeval t1, t2;
 
     ssize_t firstBytesSent;
+    gettimeofday(&t1, NULL);
     //Send first message to server
     if((firstBytesSent = sendto(socketFD, "first", sizeof("first"), 0, (struct sockaddr *) &sa, sizeof(sa))) == -1){
         printf("Error sending message to server\n");
@@ -190,75 +191,71 @@ int main(int argc, char *argv[]){
         printf("Error receiving message from server");
         exit(1);
     }
-
+    gettimeofday(&t2, NULL);
+    
+    //printf("rtt is %ld %ld\n",ts.tv_sec, ts.tv_nsec);
     //setup timer    using 3*RTT as timeout value
     struct timeval  timeout;      
-    timeout.tv_sec = 3*ts.tv_sec;
-    timeout.tv_usec = 3*ts.tv_nsec*1000;
+    timeout.tv_sec = 5*(t2.tv_sec-t1.tv_sec);
+    timeout.tv_usec = 5*(t2.tv_usec-t1.tv_usec);
     /////////////////////////////////////////////////////////////////
-    
+    printf("rtt is %ld %ld\n",timeout.tv_sec, timeout.tv_usec);
     
     
 
     int index=1;
     bufLen = 10;
-
+    int old=0;
+    int loopcount=0;
+    //setup socket timeout
     
-    while(index<frag_no){
+    while(index<=total_frag){
         int length;   
-        char buf[bufLen]; 
+        char buff[bufLen];
+        loopcount++;
+        //printf("sending segment %d/%d\n", index,total_frag);
+               
         char* message_s = packet_to_message(packet_array[index],&length);
         
         if((bytesSent = sendto(socketFD, message_s, length, 0, (struct sockaddr *) &sa, sizeof(sa))) == -1){
             printf("Error sending message to server\n");
             exit(1);
+        }   
+        if(setsockopt(socketFD, SOL_SOCKET, SO_RCVTIMEO,&timeout,sizeof(timeout)) < 0) {
+        printf("error setting timeout");
         }
-        
-        //setup socket timeout
-        if (setsockopt(socketFD, SOL_SOCKET, SO_RCVTIMEO,&timeout,sizeof(timeout)) < 0) {
-            printf("error setting timeout");
+        if((bytesReceived=recvfrom(socketFD, buff, bufLen, 0, (struct sockaddr *) &sa_stor, &sa_stor_size))==-1){
+            printf("retransmitting segment %d\n",index);
+            old++;
+            continue;
         }
-        
-        
-        if((bytesReceived = recvfrom(socketFD, buf, bufLen, 0, (struct sockaddr *) &sa_stor, &sa_stor_size)) == -1){
-            printf("Error receiving message from server");
-            exit(1);
-        }
-        
-        //check if buffer is empty, empty means lost ack
-        if(buf!=""){
+        if(strcmp(buff,"yes")==0){
             index++; //not empty we move on to next packet
         }
-    }
-    /*
-    for(int i=1; i<frag_no;i++){
-        int length;
-        char* message_s = packet_to_message(packet_array[i],&length);
-        if((bytesSent = sendto(socketFD, message_s, length, 0, (struct sockaddr *) &sa, sizeof(sa))) == -1){
-            printf("Error sending message to server\n");
-            exit(1);
+        else{
+            printf("resending segment %d/%d\n", index,frag_no);
         }
-        printf("waiting for ack\n");
-        if((bytesReceived = recvfrom(socketFD, buf, bufLen, 0, (struct sockaddr *) &sa_stor, &sa_stor_size)) == -1){
-            printf("Error receiving message from server");
-            exit(1);
-        }
-        printf("ack received\n");
+        
     }
-    */
-
+    printf("total dropped %d\n",old);
+    printf("total frags %d\n",total_frag);
+    printf("loops ran %d\n",loopcount);
     //Receive message from server
-    if((bytesReceived = recvfrom(socketFD, buf, bufLen, 0, (struct sockaddr *) &sa_stor, &sa_stor_size)) == -1){
-        printf("Error receiving message from server");
+    char last[10];
+    timeout.tv_sec=0;
+    timeout.tv_usec=0;
+    if(setsockopt(socketFD, SOL_SOCKET, SO_RCVTIMEO,&timeout,sizeof(timeout)) < 0) {
+        printf("error setting timeout");
+    }
+    if((bytesReceived=recvfrom(socketFD, last, sizeof(last), 0, (struct sockaddr *) &sa_stor, &sa_stor_size))==-1){
+        printf("error receiving last ack");
         exit(1);
     }
-    
     
     //Check return message from server
-    if(strcmp(buf, "completed") != 0){
-        exit(1);
+    if(strcmp(last, "completed") != 0){
+        printf("error receiving completion ack");       
     }
-
     printf("File transfer completed\n");
     close(socketFD);
     

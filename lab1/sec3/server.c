@@ -129,13 +129,12 @@ int server(char *port_num){
         printf("first listener:recvfrom failed");
         return -1;
     }
-    else{
-        if((bytes_sent = sendto(socket1,"first",sizeof("first"),0,(struct sockaddr *)&deliver_addr, addr_len))==-1){
-            //response to client failed
-            printf("listener:sendto failed");
-            return -1;
-        }
+    if((bytes_sent = sendto(socket1,"first",sizeof("first"),0,(struct sockaddr *)&deliver_addr, addr_len))==-1){
+        //response to client failed
+        printf("listener:sendto failed");
+        return -1;
     }
+
     /////////////////////////////////////////////////////////
     
     //begin file transfer
@@ -145,19 +144,10 @@ int server(char *port_num){
     //FILE *fp = fopen(path,"ab");   
     FILE *fp;
     size_t writer;
-    /*
-    if((writer=fwrite(first_packet.filedata,1,first_packet.size,fp))<0)
-        printf("error writing file");
     
-    char ack [10] = "yes";
-    if((bytes_sent = sendto(socket1,ack,sizeof(ack),0,(struct sockaddr *)&deliver_addr, addr_len))==-1){
-        //response to client failed
-        printf("listener:sendto failed");
-        return -1;
-    }
-    */
     int index = 1;
     bool fin = false;
+    int total=0;
     while(!fin){
         if((bytes_received = recvfrom(socket1, buf, sizeof(buf), 0, (struct sockaddr *)&deliver_addr, &addr_len)) == -1){
                 //receive failed
@@ -165,8 +155,9 @@ int server(char *port_num){
                 return -1;
         }
         
-        float randNum = rand()/RAND_MAX; //simulate 1/100 drop
-        if (randNum > 1e-2){           
+        float randNum = ((float)rand())/RAND_MAX; //simulate 1/100 drop
+        
+        if (randNum>1e-2){           
             struct packet p = message_to_packet(buf);
             
             //first time requires opening file
@@ -177,8 +168,8 @@ int server(char *port_num){
             
             
             if((writer=fwrite(p.filedata,1,p.size,fp))<0)
-            printf("error writing file");
-    
+                printf("error writing file");
+            
             char ack [10] = "yes";
             if((bytes_sent = sendto(socket1,ack,sizeof(ack),0,(struct sockaddr *)&deliver_addr, addr_len))==-1){
                 //response to client failed
@@ -186,14 +177,17 @@ int server(char *port_num){
                 return -1;
             }
             
+            
             //check if it's the last segment
+            
             if(p.frag_no==p.total_frag)
                 fin=true;
         }
+        else
+            total++;
     }
-    
     fclose(fp);
-    
+    printf("total dropped %d\n",total);
     
     //respond to client
     char message_return [10] = "completed";
