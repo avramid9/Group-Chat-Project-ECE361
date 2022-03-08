@@ -1,4 +1,12 @@
 #include <stdio.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
+#include <unistd.h>
+#include <string.h>
+#include <fcntl.h>
+#include <dirent.h>
 #include <stdbool.h>
 
 
@@ -16,6 +24,16 @@
 #define QUERY 12
 #define QU_ACK 13
 
+#define MAX_NAME 100
+#define MAX_DATA 1000
+
+struct message {
+    unsigned int type;
+    unsigned int size;
+    unsigned char source[MAX_NAME];
+    unsigned char data[MAX_DATA];
+};
+
 bool login();
 void getList();
 bool logout();
@@ -23,6 +41,8 @@ void create_session(char* id);
 bool join_session(char* id);
 bool leave_session();
 void send_message(char* message);
+char* message_to_string(struct message m);
+
 
 char sesh_id[30];
 
@@ -137,3 +157,52 @@ void send_message(char* message){
     printf("sent\n");
     return;
 };
+
+
+char* message_to_string(struct message m) {
+    //Get strings and their length from first 2 fields in packet
+    int type_len = snprintf(NULL, 0, "%d", m.type);
+    char* type = malloc(type_len + 1);
+    snprintf(type, type_len+1, "%d", m.type);
+
+    int size_len = snprintf(NULL, 0, "%d", m.size);
+    char* size = malloc(size_len + 1);
+    snprintf(size, size_len+1, "%d", m.size);
+
+    //Allocate char array for the message which will be returned as a pointer
+    int sSize = 3 + type_len + size_len + MAX_NAME + m.size; 
+    char *s = malloc(sSize);
+
+    //Keep track of position each time we add a string to the message
+    int sPos = 0;
+
+    //Add first two variables to message
+    for(int i = sPos; i < (sPos + type_len); i++){
+        s[i] = type[i-sPos];
+    }
+    s[sPos + type_len] = ':';
+    sPos += type_len+1;
+
+    for(int i = sPos; i < (sPos + size_len); i++){
+        s[i] = size[i-sPos];
+    }
+    s[sPos + size_len] = ':';
+    sPos += size_len+1;
+
+    //Add source to message
+    for(int i = sPos; i < sPos+MAX_NAME; i++){
+        s[i] = m.source[i-sPos];
+    }
+    s[sPos + MAX_NAME] = ':';
+    sPos += MAX_NAME+1;
+
+    //Add data to message
+    for(int i = sPos; i < sSize; i++){
+        s[i] = m.data[i-sPos];
+    }
+
+    free(type);
+    free(size);
+
+    return s;
+}
