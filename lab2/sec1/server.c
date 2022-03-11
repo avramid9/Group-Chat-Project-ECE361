@@ -11,7 +11,7 @@
 
 
 #define MAX_NAME 100
-#define MAX_DATA 1024
+#define MAX_DATA 1000
 
 //lookup table between id and session_id(in string form)
 char sesh_id_to_name[10][MAX_NAME];
@@ -34,8 +34,8 @@ struct message {
 
 struct client_info client_list[4];
 
-struct message string_to_message(char* s);
 void initialize_client_list();
+struct message string_to_message(char* s, int* len);
 
 int main(int argc, char *argv[]) {
     //setup hardcoded client infos
@@ -152,12 +152,16 @@ void initialize_client_list(){
     return;
 }
 
-struct message string_to_message(char* s) {
+
+struct message string_to_message(char* s, int* len) {
     struct message m;
 
+    //Get len
+    *len = (int)((s[1] << 8) + s[0]);
+
      //Get type
-    int start = 0;
-    int end = 0;
+    int start = 3;
+    int end = 3;
     char val = s[end];
     while(val != ':'){
         end++;
@@ -184,11 +188,18 @@ struct message string_to_message(char* s) {
     start = end;
 
     //Get source
-    memcpy(m.source, &s[start], MAX_NAME);
-    start += MAX_NAME;
+    val = s[end];
+    while(val != ':'){
+        end++;
+        val = s[end];
+    }
+    strncpy(m.source, &s[start], end);
+    m.source[end-start] = '\0';
+    end++;
+    start = end;
 
     //Get data
-    memcpy(m.data, &s[start], MAX_DATA);
+    memcpy(m.data, &s[start], m.size);
 
     return m;
 }
