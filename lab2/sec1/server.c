@@ -33,6 +33,7 @@ struct message {
 };
 
 struct client_info client_list[4];
+int list_size = 5;
 
 void initialize_client_list();
 struct message string_to_message(char* s, int* len);
@@ -54,7 +55,7 @@ int main(int argc, char *argv[]) {
     socklen_t addrlen;
     struct addrinfo hints;
     struct addrinfo *servinfo;
-    
+    int bytes_rec;
     
     FD_ZERO(&master); // clear the master and temp sets
     FD_ZERO(&read_fds);
@@ -95,10 +96,11 @@ int main(int argc, char *argv[]) {
             printf("error setting up select()");
             return 0;
         }
+        char message_size [2];
         
         //loop through existing connections
         for(int conns=0; conns<=fdmax; conns++){
-            if (FD_ISSET(conns, &read_fds)) { //if int conns is in the set of fd
+            if(FD_ISSET(conns, &read_fds)) { //if int conns is in the set of fd
                 if(conns==listener){ //if it's listener, that means someone new is trying to connect
                     addrlen = sizeof(clientaddr);
                     if((newfd = accept(listener,(struct sockaddr *)&clientaddr,addrlen))<0){
@@ -114,7 +116,28 @@ int main(int argc, char *argv[]) {
                     }                   
                 }
                 else{ //if data not coming from listener, that means clients sent stuff to server
-                    
+                    while((bytes_rec=recv(conns,message_size,sizeof message_size))!=-1){
+                        if(bytes_rec==0)
+                            printf("connection closed");
+                        //convert message_size char to int
+                        
+                        char buf[256];
+                        int remaining_size;
+                        if((bytes_rec=recv(conns,buf,remaining_size))<=0){
+                            if(bytes_rec==0)
+                                printf("connection closed");
+                            else
+                                printf("error receiving from client %d",conns);
+                        }
+                        
+                        //convert serial to message
+                        //struct message m = convert()
+                        // first check if they're logged in
+                        //
+                         //if m.type == LOGIN
+                         //login_ack
+                        
+                    }
                 }
             }
         }
@@ -153,7 +176,19 @@ void initialize_client_list(){
 }
 
 
-struct message string_to_message(char* s, int* len) {
+
+
+
+int client_id_from_name(char* s){
+    for(int i=0;i<list_size;i++){
+        if(strcmp(client_list[i].id,s)==0)
+            return i;
+    }
+    return -1;
+}
+
+struct message string_to_message(char* s,int* len) {
+
     struct message m;
 
     //Get len

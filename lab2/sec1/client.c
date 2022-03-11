@@ -97,22 +97,20 @@ int main() {
                         printf("please join or create session first.\n");
                     else
                         in_sesh = leave_session();
+                }               
+                else if(strcmp(command,"/quit")==0){
+                    login_status = logout();
+                    printf("Quitting client.\n");
+                    return 0;
                 }
-                else if(strcmp(command,"<text>")==0){
+                else{ //text
                     if(in_sesh)
                         printf("please join or create session first.\n");
                     else{
                         scanf("%s",&text);
                         send_message(text);                      
                     }
-                }
-                else if(strcmp(command,"/quit")==0){
-                    login_status = logout();
-                    printf("Quitting client.\n");
-                    return 0;
-                }
-                else
-                    printf("Invalid command.\n");
+                }                   
             }
         }
         else if(strcmp(command,"/quit")==0){
