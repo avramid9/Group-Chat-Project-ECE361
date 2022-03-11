@@ -36,7 +36,8 @@ struct client_info client_list[4];
 int list_size = 5;
 
 void initialize_client_list();
-struct message string_to_message(char* s, int* len);
+struct message string_to_message(char* s);
+int getLenFromString(char* s);
 
 int main(int argc, char *argv[]) {
     //setup hardcoded client infos
@@ -187,12 +188,12 @@ int client_id_from_name(char* s){
     return -1;
 }
 
-struct message string_to_message(char* s,int* len) {
+struct message string_to_message(char* s) {
 
     struct message m;
 
     //Get len
-    *len = (int)((s[1] << 8) + s[0]);
+    //*len = (int)((s[1] << 8) + s[0]);
 
      //Get type
     int start = 3;
@@ -237,4 +238,8 @@ struct message string_to_message(char* s,int* len) {
     memcpy(m.data, &s[start], m.size);
 
     return m;
+}
+
+int getLenFromString(char* s) {
+    return (int)((s[1] << 8) + s[0]);
 }
