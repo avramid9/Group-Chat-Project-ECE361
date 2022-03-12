@@ -36,6 +36,7 @@ struct client_info client_list[4];
 int list_size = 5;
 
 void initialize_client_list();
+char* message_to_string(struct message m);
 struct message string_to_message(char* s);
 int getLenFromString(char* s);
 
@@ -186,6 +187,60 @@ int client_id_from_name(char* s){
             return i;
     }
     return -1;
+}
+
+char* message_to_string(struct message m) {
+    //Get strings and their length from first 2 fields in packet
+    int type_len = snprintf(NULL, 0, "%d", m.type);
+    char* type = malloc(type_len + 1);
+    snprintf(type, type_len+1, "%d", m.type);
+
+    int size_len = snprintf(NULL, 0, "%d", m.size);
+    char* size = malloc(size_len + 1);
+    snprintf(size, size_len+1, "%d", m.size);
+
+    //Allocate char array for the message which will be returned as a pointer
+    int sSize = 6 + type_len + size_len + strlen(m.source) + m.size;
+    char *s = malloc(sSize);
+    
+    //Keep track of position each time we add a string to the message
+    int sPos = 0;
+
+    //Add size bytes at begining
+    s[0] = (char) (sSize & 0xff);
+    s[1] = (char) ((sSize >> 8) & 0xff);
+    s[2] =  ':';
+    sPos = 3;
+
+    //Add first two variables to message
+    for(int i = sPos; i < (sPos + type_len); i++){
+        s[i] = type[i-sPos];
+    }
+    s[sPos + type_len] = ':';
+    sPos += type_len+1;
+    
+    for(int i = sPos; i < (sPos + size_len); i++){
+        s[i] = size[i-sPos];
+    }
+    s[sPos + size_len] = ':';
+    sPos += size_len+1;
+    
+    //Add source to message
+    for(int i = sPos; i <= sPos + strlen(m.source); i++){
+        s[i] = m.source[i-sPos];
+    }
+    s[sPos + strlen(m.source)] = ':';
+    sPos += strlen(m.source)+1;
+    
+    //Add data to message
+    for(int i = sPos; i < sPos + m.size; i++){
+        s[i] = m.data[i-sPos];
+    }
+
+    free(type);
+    free(size);
+    
+    return s;
 }
 
 struct message string_to_message(char* s) {

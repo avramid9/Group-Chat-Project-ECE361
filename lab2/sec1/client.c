@@ -42,6 +42,8 @@ bool join_session(char* id);
 bool leave_session();
 void send_message(char* message);
 char* message_to_string(struct message m);
+struct message string_to_message(char* s);
+int getLenFromString(char* s);
 
 
 char sesh_id[30];
@@ -209,4 +211,60 @@ char* message_to_string(struct message m) {
     free(size);
     
     return s;
+}
+
+struct message string_to_message(char* s) {
+
+    struct message m;
+
+    //Get len
+    //*len = (int)((s[1] << 8) + s[0]);
+
+     //Get type
+    int start = 3;
+    int end = 3;
+    char val = s[end];
+    while(val != ':'){
+        end++;
+        val = s[end];
+    }
+    char type[end-start+1];
+    memcpy(type, &s[start], end);
+    type[end-start] = '\0';
+    m.type = atoi(type);
+    end++;
+    start = end;
+
+    //Get size
+    val = s[end];
+    while(val != ':'){
+        end++;
+        val = s[end];
+    }
+    char size[end-start+1];
+    memcpy(size, &s[start], end);
+    size[end-start] = '\0';
+    m.size = atoi(size);
+    end++;
+    start = end;
+
+    //Get source
+    val = s[end];
+    while(val != ':'){
+        end++;
+        val = s[end];
+    }
+    strncpy(m.source, &s[start], end);
+    m.source[end-start] = '\0';
+    end++;
+    start = end;
+
+    //Get data
+    memcpy(m.data, &s[start], m.size);
+
+    return m;
+}
+
+int getLenFromString(char* s) {
+    return (int)((s[1] << 8) + s[0]);
 }
