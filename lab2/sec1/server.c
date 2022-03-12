@@ -9,7 +9,21 @@
 #include <dirent.h>
 #include <stdbool.h>
 
-
+#define LOGIN 1
+#define LO_ACK 2
+#define LO_NAK 3
+#define EXIT 4
+#define JOIN 5
+#define JN_ACK 6
+#define JN_NAK 7
+#define LEAVE_SESS 8
+#define NEW_SESS 9
+#define NS_ACK 10
+#define MESSAGE 11
+#define QUERY 12
+#define QU_ACK 13
+#define L_ACK 14
+#define L_NAK 15
 #define MAX_NAME 100
 #define MAX_DATA 1000
 
@@ -23,6 +37,7 @@ struct client_info {
     char password[25];
     char in_session[MAX_NAME];
     bool login_status;
+    int fd;
 };
 
 struct message {
@@ -34,11 +49,24 @@ struct message {
 
 struct client_info client_list[4];
 int list_size = 5;
+int sesh_list_size = 11;
 
 void initialize_client_list();
+<<<<<<< HEAD
 char* message_to_string(struct message m);
 struct message string_to_message(char* s);
 int getLenFromString(char* s);
+=======
+struct message string_to_message(char* s, int* len);
+void send_login_ack(int conns, int id, struct message* m);
+void send_join_ack(int conns, int id, struct message* m);
+void leave_sesh(int conns, int id, struct message* m);
+void new_sesh(int conns, int id, struct message* m);
+void send_join_ack(int conns, int id, struct message* m);
+void send_list(int conns, int id, struct message* m);
+void message_ppl(int conns, int id, struct message* m);
+
+>>>>>>> coded most of server, merging.
 
 int main(int argc, char *argv[]) {
     //setup hardcoded client infos
@@ -122,8 +150,9 @@ int main(int argc, char *argv[]) {
                         if(bytes_rec==0)
                             printf("connection closed");
                         //convert message_size char to int
-                        
-                        char buf[256];
+                        //Get len
+                        int len = (int)((message_size[1] << 8) + message_size[0]);
+                        char buf[len];
                         int remaining_size;
                         if((bytes_rec=recv(conns,buf,remaining_size))<=0){
                             if(bytes_rec==0)
@@ -133,12 +162,26 @@ int main(int argc, char *argv[]) {
                         }
                         
                         //convert serial to message
-                        //struct message m = convert()
+                        struct message m = string_to_message(buf);
                         // first check if they're logged in
-                        //
-                         //if m.type == LOGIN
-                         //login_ack
-                        
+                        int id = client_id_from_name(m.source);
+                        if(m.type==LOGIN)
+                            send_login_ack(conns,id,&m);
+                        else if(m.type==JOIN)
+                            send_join_ack(conns,id,&m);
+                        else if(m.type==LEAVE_SESS)
+                            leave_sesh(conns,id,&m);
+                        else if(m.type==NEW_SESS)
+                            new_sesh(conns,id,&m);
+                        else if(m.type==QUERY)
+                            send_list(conns,id,&m);
+                        else if(m.type==MESSAGE)
+                            message_ppl(conns,id,&m);
+                        else if(m.type==EXIT){
+                            //logout
+                            
+                        }
+                            
                     }
                 }
             }
@@ -151,34 +194,44 @@ int main(int argc, char *argv[]) {
 void initialize_client_list(){
     client_list[0].id = "bob";
     client_list[0].password="123";
-    client_list[0].in_session=NULL;
+    client_list[0].in_session="none";
     client_list[0].login_status=false;
+    client_list[0].fd=-1;
     
     client_list[1].id = "john";
     client_list[1].password="123";
-    client_list[1].in_session=NULL;
+    client_list[1].in_session="none";
     client_list[1].login_status=false;
+    client_list[1].fd=-1;
     
     client_list[2].id = "steve";
     client_list[2].password="123";
-    client_list[2].in_session=NULL;
+    client_list[2].in_session="none";
     client_list[2].login_status=false;
+    client_list[2].fd=-1;
     
     client_list[3].id = "harold";
     client_list[3].password="123";
-    client_list[3].in_session=NULL;
+    client_list[3].in_session="none";
     client_list[3].login_status=false;
+    client_list[3].fd=-1;
     
     client_list[4].id = "johnson";
     client_list[4].password="123";
-    client_list[4].in_session=NULL;
+    client_list[4].in_session="none";
     client_list[4].login_status=false;
-    
+    client_list[4].fd=-1;
     return;
 }
 
 
-
+bool last_in_sesh(char* s){
+    for(int i=0;i<list_size;i++){
+        if(strcmp(client_list[i].in_session,s)==0)
+            return false;
+    }
+    return true;
+}
 
 
 int client_id_from_name(char* s){
@@ -189,6 +242,7 @@ int client_id_from_name(char* s){
     return -1;
 }
 
+<<<<<<< HEAD
 char* message_to_string(struct message m) {
     //Get strings and their length from first 2 fields in packet
     int type_len = snprintf(NULL, 0, "%d", m.type);
@@ -243,15 +297,22 @@ char* message_to_string(struct message m) {
     return s;
 }
 
+=======
+>>>>>>> coded most of server, merging.
 struct message string_to_message(char* s) {
 
     struct message m;
-
+    /*
     //Get len
+<<<<<<< HEAD
     //*len = (int)((s[1] << 8) + s[0]);
 
+=======
+    *len = (int)((s[1] << 8) + s[0]);
+     */
+>>>>>>> coded most of server, merging.
      //Get type
-    int start = 3;
+    int start = 0;
     int end = 3;
     char val = s[end];
     while(val != ':'){
@@ -295,6 +356,128 @@ struct message string_to_message(char* s) {
     return m;
 }
 
+<<<<<<< HEAD
 int getLenFromString(char* s) {
     return (int)((s[1] << 8) + s[0]);
 }
+=======
+void send_login_ack(int conns, int id, struct message* m){
+    struct message response;
+    response.source = "server";
+    if(id==-1){
+        response.type=LO_NAK;
+        response.data = "user";
+        response.size = sizeof("user");
+    }
+    else if(strcmp(m.data,client_list[id].password)!=0){
+        response.type=LO_NAK;
+        response.size=sizeof("pw");
+        response.data="pw";
+    }
+    else{
+        response.type=LO_ACK;
+        response.size=0;
+        
+        client_list[id].login_status=true;
+        client_list[id].fd = conns;
+    }
+    char* p = message_to_string(response);
+    if(send(conns,p,sizeof(p),0)==-1)
+        printf("error sending login ack");
+    return;
+}
+
+void send_join_ack(int conns, int id, struct message* m){
+    struct message response;
+    response.source = "server";
+    int i=0;       
+    for(;i<sesh_list_size;i++){
+        if(strcmp(sesh_id_to_name[id],m.data)==0)
+            break;
+    }
+    if(i<sesh_list_size){
+        response.type=JN_ACK;
+        response.data="yes";
+        response.size = sizeof("yes");
+
+        client_list[id].in_session = m.data;
+    }
+    else{
+        response.type=JN_NAK;
+        response.data="dne";
+        response.size = sizeof("dne");
+    }
+    char* p = message_to_string(response);
+    if(send(conns,p,sizeof(p),0)==-1)
+        printf("error sending join ack");
+    return; 
+}
+void leave_sesh(int conns, int id, struct message* m){
+    struct message response;
+    response.source = "server";
+    int i=0;       
+    for(;i<sesh_list_size;i++){
+        if(strcmp(sesh_id_to_name[id],m.data)==0)
+            break;
+    }
+    if(i<sesh_list_size){
+        response.type = L_ACK;
+        response.size=0;
+        client_list[id].in_session = "none";
+        
+        //if no one left delete sesh
+        sesh_id_to_name[i]="";
+            
+    }
+    else{
+        response.type = L_NAK;
+        response.size=0;
+    }
+    char* p = message_to_string(response);
+    if(send(conns,p,sizeof(p),0)==-1)
+        printf("error sending leave sesh ack");
+    return; 
+}
+void new_sesh(int conns, int id, struct message* m){
+    struct message response;
+    response.source = "server";
+    for(int i=0;i<sesh_list_size;i++){
+        if(strcmp(sesh_id_to_name[id],"")==0){
+            sesh_id_to_name[id]=m.data;
+            response.type = NS_ACK;           
+            response.size=0;
+            char* p = message_to_string(response);
+            if(send(conns,p,sizeof(p),0)==-1)
+                printf("error sending new sesh ack");
+            return;
+        }
+    }
+    return;
+}
+
+void send_list(int conns, int id, struct message* m){
+    struct message response;
+    response.source = "server";
+    response.type=QU_ACK;
+    char list[MAX_DATA];
+    for(int i=0;i<list_size;i++){
+        strcat(list,client_list[i].id);
+        strcat(list,"|");
+        if(client_list[i].in_session=="")
+            strcat(list,"%");
+        else
+            strcat(list,client_list[i].in_session);
+        if(i!=list_size-1)
+            strcat(list,"|");
+    }
+    response.data = list;
+    response.size = sizeof(list);
+    char* p = message_to_string(response);
+    if(send(conns,p,sizeof(p),0)==-1)
+        printf("error sending new sesh ack");
+    return;
+}
+void message_ppl(int conns, int id, struct message* m){
+    
+}
+>>>>>>> coded most of server, merging.

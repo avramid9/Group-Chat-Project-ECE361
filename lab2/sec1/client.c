@@ -23,6 +23,8 @@
 #define MESSAGE 11
 #define QUERY 12
 #define QU_ACK 13
+#define L_ACK 14
+#define L_NAK 15
 
 #define MAX_NAME 100
 #define MAX_DATA 1000
