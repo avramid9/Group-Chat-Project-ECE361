@@ -52,11 +52,11 @@ int list_size = 5;
 int sesh_list_size = 11;
 
 void initialize_client_list();
-<<<<<<< HEAD
+
 char* message_to_string(struct message m);
 struct message string_to_message(char* s);
 int getLenFromString(char* s);
-=======
+
 struct message string_to_message(char* s, int* len);
 void send_login_ack(int conns, int id, struct message* m);
 void send_join_ack(int conns, int id, struct message* m);
@@ -66,7 +66,6 @@ void send_join_ack(int conns, int id, struct message* m);
 void send_list(int conns, int id, struct message* m);
 void message_ppl(int conns, int id, struct message* m);
 
->>>>>>> coded most of server, merging.
 
 int main(int argc, char *argv[]) {
     //setup hardcoded client infos
@@ -242,7 +241,7 @@ int client_id_from_name(char* s){
     return -1;
 }
 
-<<<<<<< HEAD
+
 char* message_to_string(struct message m) {
     //Get strings and their length from first 2 fields in packet
     int type_len = snprintf(NULL, 0, "%d", m.type);
@@ -297,20 +296,9 @@ char* message_to_string(struct message m) {
     return s;
 }
 
-=======
->>>>>>> coded most of server, merging.
 struct message string_to_message(char* s) {
-
     struct message m;
-    /*
-    //Get len
-<<<<<<< HEAD
-    //*len = (int)((s[1] << 8) + s[0]);
-
-=======
-    *len = (int)((s[1] << 8) + s[0]);
-     */
->>>>>>> coded most of server, merging.
+    
      //Get type
     int start = 0;
     int end = 3;
@@ -356,11 +344,11 @@ struct message string_to_message(char* s) {
     return m;
 }
 
-<<<<<<< HEAD
+
 int getLenFromString(char* s) {
     return (int)((s[1] << 8) + s[0]);
 }
-=======
+
 void send_login_ack(int conns, int id, struct message* m){
     struct message response;
     response.source = "server";
@@ -480,4 +468,4 @@ void send_list(int conns, int id, struct message* m){
 void message_ppl(int conns, int id, struct message* m){
     
 }
->>>>>>> coded most of server, merging.
+
