@@ -103,6 +103,8 @@ int main() {
                         in_sesh = leave_session();
                 }               
                 else if(strcmp(command,"/quit")==0){
+                    if(in_sesh)
+                        in_sesh = leave_session();
                     login_status = logout();
                     printf("Quitting client.\n");
                     return 0;
