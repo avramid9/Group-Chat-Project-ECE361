@@ -8,6 +8,7 @@
 #include <fcntl.h>
 #include <dirent.h>
 #include <stdbool.h>
+#include <arpa/inet.h>
 
 #define LOGIN 1
 #define LO_ACK 2
@@ -38,6 +39,8 @@ struct client_info {
     char in_session[MAX_NAME];
     bool login_status;
     int fd;
+    char ip[INET_ADDRSTRLEN];
+    int port;
 };
 
 struct message {
@@ -56,8 +59,8 @@ void initialize_client_list();
 char* message_to_string(struct message m);
 struct message string_to_message(char* s);
 int getLenFromString(char* s);
-
-struct message string_to_message(char* s, int* len);
+int client_id_from_name(char* s);
+struct message string_to_message(char* s);
 void send_login_ack(int conns, int id, struct message* m);
 void send_join_ack(int conns, int id, struct message* m);
 void leave_sesh(int conns, int id, struct message* m);
@@ -107,7 +110,7 @@ int main(int argc, char *argv[]) {
     }
         
     
-    if((bind(listener,servinfo->ai_addr, servinfo->ai_socktype, servinfo->ai_addrlen))<0){
+    if((bind(listener,servinfo->ai_addr, servinfo->ai_addrlen))<0){
         printf("error binding listener");
         return 0;
     }
@@ -132,7 +135,7 @@ int main(int argc, char *argv[]) {
             if(FD_ISSET(conns, &read_fds)) { //if int conns is in the set of fd
                 if(conns==listener){ //if it's listener, that means someone new is trying to connect
                     addrlen = sizeof(clientaddr);
-                    if((newfd = accept(listener,(struct sockaddr *)&clientaddr,addrlen))<0){
+                    if((newfd = accept(listener,(struct sockaddr *)&clientaddr,&addrlen))<0){
                         printf("error accepting client");
                         return 0;
                     }
@@ -145,15 +148,15 @@ int main(int argc, char *argv[]) {
                     }                   
                 }
                 else{ //if data not coming from listener, that means clients sent stuff to server
-                    while((bytes_rec=recv(conns,message_size,sizeof message_size))!=-1){
+                    while((bytes_rec=recv(conns,message_size,sizeof message_size,0))!=-1){
                         if(bytes_rec==0)
                             printf("connection closed");
                         //convert message_size char to int
                         //Get len
-                        int len = (int)((message_size[1] << 8) + message_size[0]);
+                        int len = getLenFromString(message_size)-3;
                         char buf[len];
                         int remaining_size;
-                        if((bytes_rec=recv(conns,buf,remaining_size))<=0){
+                        if((bytes_rec=recv(conns,buf,remaining_size,0))<=0){
                             if(bytes_rec==0)
                                 printf("connection closed");
                             else
@@ -178,7 +181,12 @@ int main(int argc, char *argv[]) {
                             message_ppl(conns,id,&m);
                         else if(m.type==EXIT){
                             //logout
-                            
+                            client_list[id].login_status=false;
+                            close(client_list[id].fd);
+                            FD_CLR(client_list[id].fd,&master);
+                            client_list[id].fd=-1;
+                            client_list[id].port=-1;
+                            memset(&client_list[id].ip[0],0,sizeof(client_list[id].ip));
                         }
                             
                     }
@@ -191,33 +199,34 @@ int main(int argc, char *argv[]) {
 }
 
 void initialize_client_list(){
-    client_list[0].id = "bob";
-    client_list[0].password="123";
-    client_list[0].in_session="none";
+    
+    strcpy(client_list[0].id,"bob");
+    strcpy(client_list[0].password,"123");
+    strcpy(client_list[0].in_session,"none");
     client_list[0].login_status=false;
     client_list[0].fd=-1;
     
-    client_list[1].id = "john";
-    client_list[1].password="123";
-    client_list[1].in_session="none";
+    strcpy(client_list[1].id,"john");
+    strcpy(client_list[1].password,"123");
+    strcpy(client_list[1].in_session,"none");
     client_list[1].login_status=false;
     client_list[1].fd=-1;
     
-    client_list[2].id = "steve";
-    client_list[2].password="123";
-    client_list[2].in_session="none";
+    strcpy(client_list[2].id,"steve");
+    strcpy(client_list[2].password,"123");
+    strcpy(client_list[2].in_session,"none");
     client_list[2].login_status=false;
     client_list[2].fd=-1;
     
-    client_list[3].id = "harold";
-    client_list[3].password="123";
-    client_list[3].in_session="none";
+    strcpy(client_list[3].id,"harold");
+    strcpy(client_list[3].password,"123");
+    strcpy(client_list[3].in_session,"none");
     client_list[3].login_status=false;
     client_list[3].fd=-1;
     
-    client_list[4].id = "johnson";
-    client_list[4].password="123";
-    client_list[4].in_session="none";
+    strcpy(client_list[4].id,"johnson");
+    strcpy(client_list[4].password,"123");
+    strcpy(client_list[4].in_session,"none");
     client_list[4].login_status=false;
     client_list[4].fd=-1;
     return;
@@ -351,18 +360,28 @@ int getLenFromString(char* s) {
 
 void send_login_ack(int conns, int id, struct message* m){
     struct message response;
-    response.source = "server";
+    strcpy(response.source,"server");
     if(id==-1){
         response.type=LO_NAK;
-        response.data = "user";
-        response.size = sizeof("user");
+        strcpy(response.data,"user");
+        response.size = 5;
     }
-    else if(strcmp(m.data,client_list[id].password)!=0){
+    else if(strcmp(m->data,client_list[id].password)!=0){
         response.type=LO_NAK;
-        response.size=sizeof("pw");
-        response.data="pw";
+        response.size=3;
+        strcpy(response.data,"pw");
     }
     else{
+        socklen_t len;
+        struct sockaddr_storage addr;
+        len = sizeof addr;
+        getpeername(conns, (struct sockaddr*)&addr, &len);
+        
+        struct sockaddr_in *s = (struct sockaddr_in *)&addr;
+        client_list[id].port = ntohs(s->sin_port);
+        inet_ntop(AF_INET, &s->sin_addr, client_list[id].ip, sizeof client_list[id].ip);
+        
+        printf("%s logged in from ip:%s port:%d\n",m->source,client_list[id].ip,client_list[id].port);
         response.type=LO_ACK;
         response.size=0;
         
@@ -370,73 +389,61 @@ void send_login_ack(int conns, int id, struct message* m){
         client_list[id].fd = conns;
     }
     char* p = message_to_string(response);
-    if(send(conns,p,sizeof(p),0)==-1)
-        printf("error sending login ack");
+    if(send(conns,p,getLenFromString(p),0)==-1)
+        printf("error sending login ack\n");
     return;
 }
 
 void send_join_ack(int conns, int id, struct message* m){
     struct message response;
-    response.source = "server";
+    strcpy(response.source,"server");
     int i=0;       
     for(;i<sesh_list_size;i++){
-        if(strcmp(sesh_id_to_name[id],m.data)==0)
+        if(strcmp(sesh_id_to_name[id],m->data)==0)
             break;
     }
     if(i<sesh_list_size){
         response.type=JN_ACK;
-        response.data="yes";
-        response.size = sizeof("yes");
-
-        client_list[id].in_session = m.data;
+        response.size=0;
+        strcpy(client_list[id].in_session,m->data);
     }
     else{
         response.type=JN_NAK;
-        response.data="dne";
+        strcpy(response.data,"dne");
         response.size = sizeof("dne");
     }
     char* p = message_to_string(response);
-    if(send(conns,p,sizeof(p),0)==-1)
-        printf("error sending join ack");
+    if(send(conns,p,getLenFromString(p),0)==-1)
+        printf("error sending join ack\n");
     return; 
 }
 void leave_sesh(int conns, int id, struct message* m){
-    struct message response;
-    response.source = "server";
     int i=0;       
     for(;i<sesh_list_size;i++){
-        if(strcmp(sesh_id_to_name[id],m.data)==0)
+        if(strcmp(sesh_id_to_name[id],m->data)==0)
             break;
     }
     if(i<sesh_list_size){
-        response.type = L_ACK;
-        response.size=0;
-        client_list[id].in_session = "none";
+        printf("%s left %s\n",m->source,client_list[id].in_session);
+        strcpy(client_list[id].in_session,"none");
         
         //if no one left delete sesh
-        sesh_id_to_name[i]="";
-            
+        strcpy(sesh_id_to_name[i],"");            
     }
-    else{
-        response.type = L_NAK;
-        response.size=0;
-    }
-    char* p = message_to_string(response);
-    if(send(conns,p,sizeof(p),0)==-1)
-        printf("error sending leave sesh ack");
     return; 
 }
 void new_sesh(int conns, int id, struct message* m){
     struct message response;
-    response.source = "server";
+    strcpy(response.source,"server");
+
     for(int i=0;i<sesh_list_size;i++){
         if(strcmp(sesh_id_to_name[id],"")==0){
-            sesh_id_to_name[id]=m.data;
+            strcpy(sesh_id_to_name[id],m->data);
             response.type = NS_ACK;           
             response.size=0;
             char* p = message_to_string(response);
-            if(send(conns,p,sizeof(p),0)==-1)
-                printf("error sending new sesh ack");
+            if(send(conns,p,getLenFromString(p),0)==-1)
+                printf("error sending new sesh ack\n");
             return;
         }
     }
@@ -445,27 +452,33 @@ void new_sesh(int conns, int id, struct message* m){
 
 void send_list(int conns, int id, struct message* m){
     struct message response;
-    response.source = "server";
+    strcpy(response.source,"server");
     response.type=QU_ACK;
     char list[MAX_DATA];
     for(int i=0;i<list_size;i++){
         strcat(list,client_list[i].id);
         strcat(list,"|");
-        if(client_list[i].in_session=="")
+        if(strcmp(client_list[i].in_session,"none")==0)
             strcat(list,"%");
         else
             strcat(list,client_list[i].in_session);
         if(i!=list_size-1)
             strcat(list,"|");
     }
-    response.data = list;
+    strcpy(response.data,list);
     response.size = sizeof(list);
     char* p = message_to_string(response);
-    if(send(conns,p,sizeof(p),0)==-1)
-        printf("error sending new sesh ack");
+    if(send(conns,p,getLenFromString(p),0)==-1)
+        printf("error sending new sesh ack\n");
     return;
 }
 void message_ppl(int conns, int id, struct message* m){
-    
+    char* p = message_to_string(*m);
+    for(int i=0;i<list_size;i++){
+        if(i!=id && strcmp(client_list[i].in_session,client_list[id].in_session)==0){
+            if(send(client_list[i].fd,p,getLenFromString(p),0)==-1)
+                printf("error sending message from %s to %s, in %s\n",m->source,client_list[id].id,client_list[id].in_session);
+        }
+    }
 }
 
