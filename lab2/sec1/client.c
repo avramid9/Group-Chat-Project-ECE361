@@ -38,7 +38,7 @@ struct message {
 
 bool login();
 void getList();
-bool logout();
+bool logout(int socketFD, char* clientID, char* password, char* serverIP, char* serverPort);
 void create_session(char* id);
 bool join_session(char* id);
 bool leave_session();
@@ -61,12 +61,14 @@ int main() {
     bool login_status=false;
     bool in_sesh = false;
 
-    while(true){
+    int socketFD = socket(AF_INET, SOCK_STREAM, 0);
+
+    while(true){     
         printf("Please login with /login <client ID> <password> <server-IP> <server-port>: ");
         scanf("%s",&command);   
         if(strcmp(command,"/login")==0){
             scanf("%s %s %s %s",&arg1,&arg2,&arg3,&arg4);
-            login_status = login(); //login() for login code
+            login_status = login(socketFD, arg1, arg2, arg3, arg4); //login() for login code
             while (login_status){
                 printf("command:");
                 scanf("%s",&command);
@@ -128,9 +130,60 @@ int main() {
     return 0;
 }
 
-bool login(){
-    printf("welcome\n");
-    return true;
+bool login(int socketFD, char* clientID, char* password, char* serverIP, char* serverPort){
+    //Put server information into sockaddr_in
+    struct sockaddr_in sa;
+    memset(&sa.sin_zero, 0, 8*sizeof(unsigned char));
+    sa.sin_family = AF_INET;
+    sa.sin_port = htons(atoi(serverPort));
+    inet_pton(AF_INET, serverIP, &(sa.sin_addr));
+
+    int err = connect(socketFD, (const struct sockaddr*)&sa, (socklen_t) sizeof(sa));
+    if(err) {
+        printf("Connection to server failed.\n");
+        return false;
+    }
+
+    struct message loginMessage = {.type = LOGIN, .size = sizeof(password), .source = clientID, .data = password};
+    char* loginString = message_to_string(loginMessage);
+    if ((int bytesSent = send(socketFD, loginString, getLenFromString(loginString), 0)) == -1) {
+        printf("Failed to send login message.\n");
+        return false;
+    }
+
+    char* recvBuff[3];
+    if ((int bytesRecv = recv(socketFD, recvBuff, sizeof(recvBuff), 0)) == -1) {
+        printf("Error receiving recv buff size\n");
+        return false;
+    }
+
+    int recvSize = getLenFromString(recvBuff);
+    int bytesRecv = 0;
+    char* recvString[recvSize];
+
+    while(bytesRecv < recvSize){
+        if ((bytesRecv += recv(socketFD, &recvString[bytesRecv], sizeof(recvString) - bytesRecv, 0)) == -1) {
+            printf("Error receiving recv buff message\n");
+            return false;
+        }
+    }
+
+    struct messsage recvMessage = string_to_message(recvString);
+    if (recvMessage.type == LO_ACK) {
+        return true;
+    }
+    else if (recvMessage.type == LO_NAK){
+        for (int i = 0; i < recvMessage.size; i++) {
+            printf("%c", recvMessage.data[i]);
+        }
+        printf("\n");
+        return false;
+    }
+    else {
+        printf("Error getting login ack.\n");
+    }
+
+    return false;
 }
 
 bool logout(){
