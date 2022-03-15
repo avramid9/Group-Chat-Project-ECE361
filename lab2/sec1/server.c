@@ -310,7 +310,7 @@ struct message string_to_message(char* s) {
     
      //Get type
     int start = 0;
-    int end = 3;
+    int end = 0;
     char val = s[end];
     while(val != ':'){
         end++;
