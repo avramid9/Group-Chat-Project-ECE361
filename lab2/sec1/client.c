@@ -48,17 +48,17 @@ struct message string_to_message(char* s);
 int getLenFromString(char* s);
 
 
-char sesh_id[30];
-char command[20];
-char client_id[20];
-char password[20];
-char server_id[20];
-char server_port[20];
-char session_list[20][20];
-char text[200];
+
 
 int main() {
-    
+    char sesh_id[30];
+    char command[20];
+    char client_id[20];
+    char password[20];
+    char server_id[20];
+    char server_port[20];
+    char session_list[20][20];
+    char text[200];
     bool login_status=false;
     bool in_sesh = false;
     
