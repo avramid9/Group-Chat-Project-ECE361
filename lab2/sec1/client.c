@@ -49,18 +49,20 @@ int getLenFromString(char* s);
 
 
 char sesh_id[30];
+char command[20];
+char client_id[20];
+char password[20];
+char server_id[20];
+char server_port[20];
+char session_list[20][20];
+char text[200];
 
 int main() {
-    char command[20];
-    char client_id[20];
-    char password[20];
-    char server_id[20];
-    char server_port[20];
-    char session_list[20][20];
-    char text[200];
+    
     bool login_status=false;
     bool in_sesh = false;
-
+    
+    fd_set readfds;
     int socketFD = socket(AF_INET, SOCK_STREAM, 0);
 
     while(true){     
@@ -69,56 +71,77 @@ int main() {
         if(strcmp(command,"/login")==0){
             scanf("%s %s %s %s", &client_id, &password, &server_id, &server_port);
             login_status = login(socketFD, client_id, password, server_id, server_port); //login() for login code
+            
+            
+            FD_ZERO(&readfds);
+            FD_SET(0,&readfds);
+            FD_SET(socketFD,&readfds);
+            printf("command: ");
             while (login_status){
-                printf("command:");
-                scanf("%s",command);
-                
-                if(strcmp(command,"/logout")==0){
-                    if(in_sesh)
-                        in_sesh = leave_session();
-                    login_status = logout(socketFD, client_id);//code to close connection if there is one
-                    printf("Logging out\n");
-                }
-                else if(strcmp(command,"/list")==0){
-                    getList(socketFD, client_id);
-                }
-                else if(strcmp(command,"/createsession")==0){
-                    scanf("%s",sesh_id);
-                    if(in_sesh)
-                        leave_session();
-                    create_session(socketFD, client_id, sesh_id);
-                    in_sesh = join_session(socketFD, client_id, sesh_id);
-                    
-                }
-                else if(strcmp(command,"/joinsession")==0){
-                    scanf("%s",sesh_id);
-                    if(in_sesh)
-                        printf("please leave session first.\n");
-                    else{                               
-                        in_sesh = join_session(socketFD, client_id, sesh_id);
-                    }
-                }
-                else if(strcmp(command,"/leavesession")==0){
-                    if(!in_sesh)
-                        printf("please join or create session first.\n");
-                    else
-                        in_sesh = leave_session();
-                }               
-                else if(strcmp(command,"/quit")==0){
-                    if(in_sesh)
-                        in_sesh = leave_session();
-                    login_status = logout(socketFD, client_id);
-                    printf("Quitting client.\n");
+                               
+                if(select(socketFD+1,&readfds,NULL,NULL,NULL)<0){ //set up multiplex with select
+                    printf("error setting up select()\n");
                     return 0;
                 }
-                else{ //text
-                    if(!in_sesh)
-                        printf("please join or create session first.\n");
-                    else{
-                        scanf("%s",&text);
-                        send_message(socketFD, client_id, text);                      
+                
+                if(FD_ISSET(socketFD,&readfds)){
+                    //server sent packet, process
+                    printf('server sent stuff\n');
+                    
+                }
+                else if(FD_ISSET(0,&readfds)){
+                    //check for IO input
+                    //need a way to grab keyboard input
+                    printf("key pressed\n");
+                    //place the obtained string in command and can proceed as before
+                    if(strcmp(command,"/logout")==0){
+                        if(in_sesh)
+                            in_sesh = leave_session();
+                        login_status = logout(socketFD, client_id);//code to close connection if there is one
+                        printf("Logging out\n");
                     }
-                }                   
+                    else if(strcmp(command,"/list")==0){
+                        getList(socketFD, client_id);
+                    }
+                    else if(strcmp(command,"/createsession")==0){
+                        scanf("%s",sesh_id);
+                        if(in_sesh)
+                            leave_session();
+                        create_session(socketFD, client_id, sesh_id);
+                        in_sesh = join_session(socketFD, client_id, sesh_id);
+
+                    }
+                    else if(strcmp(command,"/joinsession")==0){
+                        scanf("%s",sesh_id);
+                        if(in_sesh)
+                            printf("please leave session first.\n");
+                        else{                               
+                            in_sesh = join_session(socketFD, client_id, sesh_id);
+                        }
+                    }
+                    else if(strcmp(command,"/leavesession")==0){
+                        if(!in_sesh)
+                            printf("please join or create session first.\n");
+                        else
+                            in_sesh = leave_session();
+                    }               
+                    else if(strcmp(command,"/quit")==0){
+                        if(in_sesh)
+                            in_sesh = leave_session();
+                        login_status = logout(socketFD, client_id);
+                        printf("Quitting client.\n");
+                        return 0;
+                    }
+                    else{ //text
+                        if(!in_sesh)
+                            printf("please join or create session first.\n");
+                        else{
+                            scanf("%s",&text);
+                            send_message(socketFD, client_id, text);                      
+                        }
+                    }             
+                }
+                      
             }
         }
         else if(strcmp(command,"/quit")==0){
