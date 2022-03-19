@@ -23,8 +23,7 @@
 #define MESSAGE 11
 #define QUERY 12
 #define QU_ACK 13
-#define L_ACK 14
-#define L_NAK 15
+
 #define MAX_NAME 100
 #define MAX_DATA 1000
 
@@ -148,20 +147,23 @@ int main(int argc, char *argv[]) {
                     }                   
                 }
                 else{ //if data not coming from listener, that means clients sent stuff to server
-                    while((bytes_rec=recv(conns,message_size,sizeof message_size,0))!=-1){
+                    while((bytes_rec = recv(conns,message_size,sizeof message_size,0))!=-1){
                         if(bytes_rec==0)
                             printf("connection closed");
                         //convert message_size char to int
                         //Get len
-                        int len = getLenFromString(message_size)-3;
+                        int len = getLenFromString(message_size);
                         char buf[len];
                         int remaining_size;
-                        if((bytes_rec=recv(conns,buf,remaining_size,0))<=0){
-                            if(bytes_rec==0)
-                                printf("connection closed");
-                            else
-                                printf("error receiving from client %d",conns);
+                        while(bytes_rec < len){
+                            if((bytes_rec += recv(conns,buf,remaining_size,0))<=0){
+                                if(bytes_rec==0)
+                                    printf("connection closed");
+                                else
+                                    printf("error receiving from client %d",conns);
+                            }
                         }
+                        
                         
                         //convert serial to message
                         struct message m = string_to_message(buf);
@@ -361,9 +363,14 @@ int getLenFromString(char* s) {
 void send_login_ack(int conns, int id, struct message* m){
     struct message response;
     strcpy(response.source,"server");
-    if(id==-1){
+    if(client_list[id].login_status){
         response.type=LO_NAK;
         strcpy(response.data,"User already logged in");
+        response.size = strlen(response.data);
+    }
+    else if(id==-1){
+        response.type=LO_NAK;
+        strcpy(response.data,"User not found");
         response.size = strlen(response.data);
     }
     else if(strcmp(m->data,client_list[id].password)!=0){
@@ -398,37 +405,47 @@ void send_join_ack(int conns, int id, struct message* m){
     struct message response;
     strcpy(response.source,"server");
     int i=0;       
-    for(;i<sesh_list_size;i++){
-        if(strcmp(sesh_id_to_name[id],m->data)==0)
-            break;
+    for(int i=0;i<sesh_list_size;i++){
+        if(strcmp(sesh_id_to_name[i],m->data)==0){
+            response.type=JN_ACK;
+            response.size=0;
+            strcpy(client_list[id].in_session,m->data);
+            
+            char* p = message_to_string(response);
+            if(send(conns,p,getLenFromString(p),0)==-1)
+                printf("error sending join ack\n");
+            return; 
+        }
+            
     }
-    if(i<sesh_list_size){
-        response.type=JN_ACK;
-        response.size=0;
-        strcpy(client_list[id].in_session,m->data);
-    }
-    else{
-        response.type=JN_NAK;
-        strcpy(response.data,"dne");
-        response.size = sizeof("dne");
-    }
+    
+    response.type=JN_NAK;
+    strcpy(response.data,"Session does not exist");
+    response.size = strlen("Session does not exist");
+    
     char* p = message_to_string(response);
     if(send(conns,p,getLenFromString(p),0)==-1)
         printf("error sending join ack\n");
     return; 
 }
 void leave_sesh(int conns, int id, struct message* m){
-    int i=0;       
-    for(;i<sesh_list_size;i++){
-        if(strcmp(sesh_id_to_name[id],m->data)==0)
-            break;
-    }
-    if(i<sesh_list_size){
-        printf("%s left %s\n",m->source,client_list[id].in_session);
-        strcpy(client_list[id].in_session,"none");
-        
-        //if no one left delete sesh
-        strcpy(sesh_id_to_name[i],"");            
+      
+    for(int i=0;i<sesh_list_size;i++){
+        if(strcmp(sesh_id_to_name[i],client_list[id].in_session)==0){
+            printf("%s left %s\n",m->source,client_list[id].in_session);
+            strcpy(client_list[id].in_session,"none");
+
+            //if no one left delete sesh
+            bool last=true;
+            for(int j=0;j<list_size && last;j++){
+                if(strcmp(client_list[j].in_session,sesh_id_to_name[i]))
+                    last=false;
+            }
+            if(last)
+                strcpy(sesh_id_to_name[i],"");
+            return;
+        }
+           
     }
     return; 
 }

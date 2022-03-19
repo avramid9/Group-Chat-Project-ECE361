@@ -99,7 +99,7 @@ int main() {
                     }
 
                     //Get recv message
-                    int recvSize = getLenFromString(recvBuff)-3;
+                    int recvSize = getLenFromString(recvBuff);
                     //int bytesRecv = 0;
                     char recvString[recvSize];
 
