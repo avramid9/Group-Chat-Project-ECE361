@@ -104,27 +104,32 @@ int main(int argc, char *argv[]) {
     }
     
     if((listener = socket(servinfo->ai_family, servinfo->ai_socktype, servinfo->ai_protocol))<0){
-        printf("error setting socket");
+        printf("error setting socket\n");
         return 0;
     }
         
     
     if((bind(listener,servinfo->ai_addr, servinfo->ai_addrlen))<0){
-        printf("error binding listener");
+        printf("error binding listener\n");
         return 0;
     }
-        
+    
+    if(listen(listener, 10)==-1){
+        printf("error listening\n");
+        return 0;
+    }
     
     // add the listener to the master set
     FD_SET(listener, &master);
-
+    printf("listening for clients\n");
+    //fflush(stdout);
     // keep track of the biggest file descriptor
     fdmax = listener; // so far, it's this one
     
     while(true){
         read_fds = master; // copy it
         if(select(fdmax+1,&read_fds,NULL,NULL,NULL)<0){ //set up multiplex with select
-            printf("error setting up select()");
+            printf("error setting up select()\n");
             return 0;
         }
         char message_size [3];
@@ -135,39 +140,48 @@ int main(int argc, char *argv[]) {
                 if(conns==listener){ //if it's listener, that means someone new is trying to connect
                     addrlen = sizeof(clientaddr);
                     if((newfd = accept(listener,(struct sockaddr *)&clientaddr,&addrlen))<0){
-                        printf("error accepting client");
+                        printf("error accepting client %d\n",newfd);
                         return 0;
                     }
-                    else{
-                        FD_SET(newfd, &master); // add to master set
-                        if (newfd > fdmax) { // keep track of the max
-                            fdmax = newfd;
-                        }
-                        printf("new connection");
-                    }                   
+                    
+                    FD_SET(newfd, &master); // add to master set
+                    if (newfd > fdmax) { // keep track of the max
+                        fdmax = newfd;
+                    }
+                    printf("new connection\n");
+                    //fflush(stdout);
+                                       
                 }
                 else{ //if data not coming from listener, that means clients sent stuff to server
-                    while((bytes_rec = recv(conns,message_size,sizeof message_size,0))!=-1){
+                    printf("received packet!\n");
+                    fflush(stdout);
+                    if((bytes_rec = recv(conns,message_size,3,0))!=-1){
+                        //printf("in first while\n");
                         if(bytes_rec==0)
-                            printf("connection closed");
-                        //convert message_size char to int
-                        //Get len
-                        int len = getLenFromString(message_size);
-                        char buf[len];
-                        int remaining_size;
-                        while(bytes_rec < len){
-                            if((bytes_rec += recv(conns,buf,remaining_size,0))<=0){
-                                if(bytes_rec==0)
-                                    printf("connection closed");
-                                else
-                                    printf("error receiving from client %d",conns);
+                            printf("connection closed\n");
+                        //Get recv message
+                        int recvSize = getLenFromString(message_size)-3;
+                        printf("%d\n",recvSize);
+                        //int bytesRecv = 0;
+                        char recvString[recvSize];
+                        bytes_rec=0;
+                        while(bytes_rec < recvSize){
+                            //printf("received: %d\n",bytes_rec);
+                            if ((bytes_rec += recv(conns, recvString+bytes_rec, recvSize - bytes_rec, 0)) == -1) {
+                                printf("Error receiving recv buff message\n");
+                                return 0;
                             }
+                            //printf("received after: %d\n",bytes_rec);
                         }
-                        
-                        
+                        //for(int i=0;i<recvSize;i++){
+                        //    printf("%c",recvString[i]);
+
+                        //}
+                        //printf("\n");
                         //convert serial to message
-                        struct message m = string_to_message(buf);
+                        struct message m = string_to_message(recvString);
                         // first check if they're logged in
+                        printf("%u %u %s %s\n",m.type, m.size, m.source, m.data);
                         int id = client_id_from_name(m.source);
                         if(m.type==LOGIN)
                             send_login_ack(conns,id,&m);
@@ -361,22 +375,23 @@ int getLenFromString(char* s) {
 }
 
 void send_login_ack(int conns, int id, struct message* m){
+    printf("respond login\n");
     struct message response;
     strcpy(response.source,"server");
     if(client_list[id].login_status){
         response.type=LO_NAK;
         strcpy(response.data,"User already logged in");
-        response.size = strlen(response.data);
+        response.size = strlen(response.data)+1;
     }
     else if(id==-1){
         response.type=LO_NAK;
         strcpy(response.data,"User not found");
-        response.size = strlen(response.data);
+        response.size = strlen(response.data)+1;
     }
     else if(strcmp(m->data,client_list[id].password)!=0){
         response.type=LO_NAK;
         strcpy(response.data,"Wrong password");
-        response.size = strlen(response.data);
+        response.size = strlen(response.data)+1;
     }
     else{
         socklen_t len;
@@ -408,12 +423,15 @@ void send_join_ack(int conns, int id, struct message* m){
     for(int i=0;i<sesh_list_size;i++){
         if(strcmp(sesh_id_to_name[i],m->data)==0){
             response.type=JN_ACK;
-            response.size=0;
+            response.size=strlen(m->data)+1;
             strcpy(client_list[id].in_session,m->data);
+            strcpy(response.data,m->data);
             
             char* p = message_to_string(response);
-            if(send(conns,p,getLenFromString(p),0)==-1)
+            int bytesSent;
+            if((bytesSent=send(conns,p,getLenFromString(p),0))==-1)
                 printf("error sending join ack\n");
+            printf("sent join ack %d\n",bytesSent);
             return; 
         }
             
@@ -421,11 +439,13 @@ void send_join_ack(int conns, int id, struct message* m){
     
     response.type=JN_NAK;
     strcpy(response.data,"Session does not exist");
-    response.size = strlen("Session does not exist");
+    response.size = strlen("Session does not exist")+1;
     
     char* p = message_to_string(response);
-    if(send(conns,p,getLenFromString(p),0)==-1)
+    int bytesSent;
+    if((bytesSent = send(conns,p,getLenFromString(p),0))==-1)
         printf("error sending join ack\n");
+    printf("sent join nack\n");
     return; 
 }
 void leave_sesh(int conns, int id, struct message* m){
@@ -438,7 +458,7 @@ void leave_sesh(int conns, int id, struct message* m){
             //if no one left delete sesh
             bool last=true;
             for(int j=0;j<list_size && last;j++){
-                if(strcmp(client_list[j].in_session,sesh_id_to_name[i]))
+                if(strcmp(client_list[j].in_session,sesh_id_to_name[i])==0)
                     last=false;
             }
             if(last)
@@ -452,15 +472,17 @@ void leave_sesh(int conns, int id, struct message* m){
 void new_sesh(int conns, int id, struct message* m){
     struct message response;
     strcpy(response.source,"server");
-
+    
     for(int i=0;i<sesh_list_size;i++){
         if(strcmp(sesh_id_to_name[i],"")==0){
             strcpy(sesh_id_to_name[i],m->data);
             response.type = NS_ACK;           
             response.size=0;
             char* p = message_to_string(response);
-            if(send(conns,p,getLenFromString(p),0)==-1)
+            int bytesSent;
+            if((bytesSent = send(conns,p,getLenFromString(p),0))==-1)
                 printf("error sending new sesh ack\n");
+            printf("sent new_sesh ack %d\n",bytesSent);
             return;
         }
     }
@@ -471,10 +493,10 @@ void send_list(int conns, int id, struct message* m){
     struct message response;
     strcpy(response.source,"server");
     response.type=QU_ACK;
-    char list[MAX_DATA];
-    strcat(list,"Available sessions:\n");
+    char list[MAX_DATA] = "\nAvailable sessions:\n";
+    
     for(int i=0;i<sesh_list_size;i++){
-        if(strcmp(sesh_id_to_name[i],"")==0){
+        if(strcmp(sesh_id_to_name[i],"")!=0){
             strcat(list,sesh_id_to_name[i]);
             strcat(list,"\n");
         }
@@ -487,13 +509,15 @@ void send_list(int conns, int id, struct message* m){
             strcat(list,"none");
         else
             strcat(list,client_list[i].in_session);
-        if(i!=list_size-1)
-            strcat(list,"\n");
+        //if(i!=list_size-1)
+        strcat(list,"\n");
     }
     strcpy(response.data,list);
-    response.size = strlen(list);
+    response.size = strlen(response.data)+1;
+    printf("%u %u %s %s\n",response.type,response.size,response.source,response.data);
     char* p = message_to_string(response);
-    if(send(conns,p,getLenFromString(p),0)==-1)
+    int bytesSent;
+    if((bytesSent = send(conns,p,getLenFromString(p),0))==-1)
         printf("error sending new sesh ack\n");
     return;
 }
@@ -501,7 +525,8 @@ void message_ppl(int conns, int id, struct message* m){
     char* p = message_to_string(*m);
     for(int i=0;i<list_size;i++){
         if(i!=id && strcmp(client_list[i].in_session,client_list[id].in_session)==0){
-            if(send(client_list[i].fd,p,getLenFromString(p),0)==-1)
+            int bytesSent;
+            if((bytesSent = send(client_list[i].fd,p,getLenFromString(p),0)) == -1)
                 printf("error sending message from %s to %s, in %s\n",m->source,client_list[id].id,client_list[id].in_session);
         }
     }
