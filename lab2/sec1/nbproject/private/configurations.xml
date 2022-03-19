@@ -4,6 +4,7 @@
     <df root="." name="0">
       <in>client.c</in>
       <in>server.c</in>
+      <in>testing.c</in>
     </df>
   </logicalFolder>
   <projectmakefile>makefile</projectmakefile>

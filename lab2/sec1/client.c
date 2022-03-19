@@ -8,7 +8,7 @@
 #include <fcntl.h>
 #include <dirent.h>
 #include <stdbool.h>
-
+#include <arpa/inet.h>
 
 #define LOGIN 1
 #define LO_ACK 2
@@ -23,8 +23,7 @@
 #define MESSAGE 11
 #define QUERY 12
 #define QU_ACK 13
-#define L_ACK 14
-#define L_NAK 15
+
 
 #define MAX_NAME 100
 #define MAX_DATA 1000
@@ -40,7 +39,7 @@ bool login(int socketFD, char* clientID, char* password, char* serverIP, char* s
 void getList(int socketFD, char* clientID);
 bool logout(int socketFD, char* clientID);
 void create_session(int socketFD, char* clientID, char* sessionID);
-bool join_session(int socketFD, char* clientID, char* sessionID);
+void join_session(int socketFD, char* clientID, char* sessionID);
 bool leave_session(int socketFD, char* clientID);
 void send_message(int socketFD, char* clientID, char* message);
 char* message_to_string(struct message m);
@@ -49,11 +48,10 @@ int getLenFromString(char* s);
 
 
 
-
+char client_id[20];
 int main() {
     char sesh_id[30];
-    char command[20];
-    char client_id[20];
+    char command[20];   
     char password[20];
     char server_id[20];
     char server_port[20];
@@ -61,73 +59,136 @@ int main() {
     char text[200];
     bool login_status=false;
     bool in_sesh = false;
-    
+    char buffer[400];
     fd_set readfds;
+    int num=0;
     int socketFD = socket(AF_INET, SOCK_STREAM, 0);
-
+    
+            
     while(true){     
         printf("Please login with /login <client ID> <password> <server-IP> <server-port>: ");
-        scanf("%s",command);   
+        scanf("%s %s %s %s %s",&command,&client_id, &password, &server_id, &server_port); 
+        //strcpy(command,"/login");
         if(strcmp(command,"/login")==0){
-            scanf("%s %s %s %s", &client_id, &password, &server_id, &server_port);
+            //scanf("%s %s %s %s", );
             login_status = login(socketFD, client_id, password, server_id, server_port); //login() for login code
-            
+            //login_status=true;
             
             FD_ZERO(&readfds);
             FD_SET(0,&readfds);
             FD_SET(socketFD,&readfds);
+            
             printf("command: ");
             while (login_status){
-                               
-                if(select(socketFD+1,&readfds,NULL,NULL,NULL)<0){ //set up multiplex with select
+                if(select(1,&readfds,NULL,NULL,NULL)<0){ //set up multiplex with select
                     printf("error setting up select()\n");
                     return 0;
-                }
+                }               
+                
                 
                 if(FD_ISSET(socketFD,&readfds)){
                     //server sent packet, process
-                    printf('server sent stuff\n');
+                    printf("server sent stuff\n");
+
+                    //Get recv size
+                    char recvBuff[3];
+                    int bytesRecv;
+                    if ((bytesRecv = recv(socketFD, recvBuff, sizeof(recvBuff), 0)) == -1) {
+                        printf("Error receiving recv buff size\n");
+                        return 0;
+                    }
+
+                    //Get recv message
+                    int recvSize = getLenFromString(recvBuff)-3;
+                    //int bytesRecv = 0;
+                    char recvString[recvSize];
+
+                    while(bytesRecv < recvSize){
+                        if ((bytesRecv += recv(socketFD, &recvString[bytesRecv], sizeof(recvString) - bytesRecv, 0)) == -1) {
+                            printf("Error receiving recv buff message\n");
+                            return 0;
+                        }
+                    }
+                    
+                    struct message recvMessage = string_to_message(recvString);
+                    char* token;
+                    switch(recvMessage.type){
+                        case JN_ACK:
+                            in_sesh = true;
+                            printf("%s: joined %s\n",recvMessage.source,recvMessage.data);
+                            break;
+                        case JN_NAK:
+                            in_sesh = false;
+                            printf("%s: %s\n",recvMessage.source,recvMessage.data);
+                            break;
+                        case NS_ACK:
+                            printf("created session\n");
+                            break;
+                        case QU_ACK:
+                            printf("%s: %s\n",recvMessage.source,recvMessage.data);
+                            break;
+                        case MESSAGE:
+                            printf("%s: %s\n",recvMessage.source,recvMessage.data);
+                        default:
+                            printf("Unexpected ack type\n");
+                            break;
+                    }
+                            
+                    
+                    
                     
                 }
                 else if(FD_ISSET(0,&readfds)){
                     //check for IO input
                     //need a way to grab keyboard input
-                    printf("key pressed\n");
-                    //place the obtained string in command and can proceed as before
-                    if(strcmp(command,"/logout")==0){
+                   
+                    fgets(buffer,400,stdin);
+                                       
+                    char *token;
+   
+                    /* get the first token */
+                    token = strtok(buffer, " ");
+                    
+                    if(strcmp(token,"/logout")==0){
                         if(in_sesh)
-                            in_sesh = leave_session();
+                            in_sesh = leave_session(socketFD, client_id);
                         login_status = logout(socketFD, client_id);//code to close connection if there is one
                         printf("Logging out\n");
                     }
-                    else if(strcmp(command,"/list")==0){
+                    else if(strcmp(token,"/list")==0){
                         getList(socketFD, client_id);
                     }
-                    else if(strcmp(command,"/createsession")==0){
-                        scanf("%s",sesh_id);
-                        if(in_sesh)
-                            leave_session();
-                        create_session(socketFD, client_id, sesh_id);
-                        in_sesh = join_session(socketFD, client_id, sesh_id);
-
-                    }
-                    else if(strcmp(command,"/joinsession")==0){
-                        scanf("%s",sesh_id);
-                        if(in_sesh)
-                            printf("please leave session first.\n");
-                        else{                               
-                            in_sesh = join_session(socketFD, client_id, sesh_id);
+                    else if(strcmp(token,"/createsession")==0){
+                        
+                        token = strtok(NULL," ");
+                        if(token==NULL)
+                            printf("Missing id\n");
+                        else{
+                            if(in_sesh)
+                                leave_session(socketFD, client_id);
+                            create_session(socketFD, client_id, token);
+                            join_session(socketFD, client_id, token);
                         }
                     }
-                    else if(strcmp(command,"/leavesession")==0){
+                    else if(strcmp(token,"/joinsession")==0){
+                        token = strtok(NULL," ");
+                        if(token==NULL)
+                            printf("Missing id\n");
+                        else{
+                            if(in_sesh)
+                                leave_session(socketFD, client_id);
+                            join_session(socketFD, client_id, token);
+                        }
+                    }
+                    else if(strcmp(token,"/leavesession")==0){
                         if(!in_sesh)
                             printf("please join or create session first.\n");
                         else
-                            in_sesh = leave_session();
+                            in_sesh = leave_session(socketFD, client_id);
                     }               
-                    else if(strcmp(command,"/quit")==0){
+                    else if(strcmp(token,"/quit")==0){
                         if(in_sesh)
-                            in_sesh = leave_session();
+                            in_sesh = leave_session(socketFD, client_id);
                         login_status = logout(socketFD, client_id);
                         printf("Quitting client.\n");
                         return 0;
@@ -135,11 +196,11 @@ int main() {
                     else{ //text
                         if(!in_sesh)
                             printf("please join or create session first.\n");
-                        else{
-                            scanf("%s",&text);
-                            send_message(socketFD, client_id, text);                      
+                        else{                           
+                            send_message(socketFD, client_id, buffer);                      
                         }
-                    }             
+                    }     
+                            
                 }
                       
             }
@@ -171,30 +232,32 @@ bool login(int socketFD, char* clientID, char* password, char* serverIP, char* s
     }
 
     //Create message
-    client_id = clientID;
+    strcpy(client_id,clientID);
     struct message loginMessage = {.type = LOGIN, .size = strlen(password)};
     strcpy(loginMessage.source, clientID);
     memcpy(loginMessage.data, password, strlen(password));
 
     //Send message
     char* loginString = message_to_string(loginMessage);
-    if ((int bytesSent = send(socketFD, loginString, getLenFromString(loginString), 0)) == -1) {
+    int bytesSent;
+    if ((bytesSent = send(socketFD, loginString, getLenFromString(loginString), 0)) == -1) {
         printf("Failed to send login message.\n");
         return false;
     }
 
     //Get recv size
-    char* recvBuff[3];
-    if ((int bytesRecv = recv(socketFD, recvBuff, sizeof(recvBuff), 0)) == -1) {
+    char recvBuff[3];
+    int bytesRecv;
+    if ((bytesRecv = recv(socketFD, recvBuff, sizeof(recvBuff), 0)) == -1) {
         printf("Error receiving recv buff size\n");
         return false;
     }
 
     //Get recv message
-    int recvSize = getLenFromString(recvBuff);
-    int bytesRecv = 0;
-    char* recvString[recvSize];
-
+    int recvSize = getLenFromString(recvBuff)-3;
+    //int bytesRecv = 0;
+    char recvString[recvSize];
+    
     while(bytesRecv < recvSize){
         if ((bytesRecv += recv(socketFD, &recvString[bytesRecv], recvSize - bytesRecv, 0)) == -1) {
             printf("Error receiving recv buff message\n");
@@ -203,16 +266,16 @@ bool login(int socketFD, char* clientID, char* password, char* serverIP, char* s
     }
 
     //Process ack
-    struct messsage recvMessage = string_to_message(recvString);
+    struct message recvMessage = string_to_message(recvString);
     if (recvMessage.type == LO_ACK) {
         printf("Logged in!\n");
         return true;
     }
     else if (recvMessage.type == LO_NAK){
-        for (int i = 0; i < recvMessage.size; i++) {
-            printf("%c", recvMessage.data[i]);
-        }
-        printf("\n");
+        //for (int i = 0; i < recvMessage.size; i++) {
+          //  printf("%c", recvMessage.data[i]);
+        //}
+        printf("%s\n",recvMessage.data);
         return false;
     }
     else {
@@ -225,17 +288,18 @@ bool login(int socketFD, char* clientID, char* password, char* serverIP, char* s
 bool logout(int socketFD, char* clientID){
     //Create logout message
     struct message logoutMessage = {.type = EXIT, .size = 0};
-    strcpy(loginMessage.source, clientID);
+    strcpy(logoutMessage.source, clientID);
 
     //Send message
     char* logoutString = message_to_string(logoutMessage);
-    if ((int bytesSent = send(socketFD, logoutString, getLenFromString(logoutString), 0)) == -1) {
+    int bytesSent;
+    if ((bytesSent = send(socketFD, logoutString, getLenFromString(logoutString), 0)) == -1) {
         printf("Failed to send logout message.\n");
         return true;
     }
 
     //Not sure if close() should be called here or on server
-    //close(socketFD);
+    close(socketFD);
 
     printf("goodbye\n");
     return false;
@@ -244,160 +308,64 @@ bool logout(int socketFD, char* clientID){
 void getList(int socketFD, char* clientID){
     //Create list message
     struct message listMessage = {.type = QUERY, .size = 0};
-    strcpy(loginMessage.source, clientID);
+    strcpy(listMessage.source, clientID);
     
     //Send list message
     char* listString = message_to_string(listMessage);
-    if ((int bytesSent = send(socketFD, listString, getLenFromString(listString), 0)) == -1) {
+    int bytesSent;
+    if ((bytesSent = send(socketFD, listString, getLenFromString(listString), 0)) == -1) {
         printf("Failed to send list message.\n");
         return;
     }
-
-    //Get recv size
-    char* recvBuff[3];
-    if ((int bytesRecv = recv(socketFD, recvBuff, sizeof(recvBuff), 0)) == -1) {
-        printf("Error receiving recv buff size\n");
-        return;
-    }
-
-    //Get recv message
-    int recvSize = getLenFromString(recvBuff);
-    int bytesRecv = 0;
-    char* recvString[recvSize];
-
-    while(bytesRecv < recvSize){
-        if ((bytesRecv += recv(socketFD, &recvString[bytesRecv], sizeof(recvString) - bytesRecv, 0)) == -1) {
-            printf("Error receiving recv buff message\n");
-            return;
-        }
-    }
-
-    //Process ack
-    struct messsage recvMessage = string_to_message(recvString);
-    if (recvMessage.type == QU_ACK) {
-        for (int i = 0; i < recvMessage.size; i++) {
-            printf("%c", recvMessage.data[i]);
-        }
-        printf("\n");
-    }
-    else {
-        printf("Error getting query ack.\n");
-        return;
-    }
-
-    printf("returned list\n");
     return;
 }
 
 void create_session(int socketFD, char* clientID, char* sessionID){
     //Create new session message
     struct message newsessionMessage = {.type = NEW_SESS, .size = strlen(sessionID)};
-    strcpy(newsessionnMessage.source, clientID);
+    strcpy(newsessionMessage.source, clientID);
     memcpy(newsessionMessage.data, sessionID, strlen(sessionID));
 
     //Send create session message
     char* newsessionString = message_to_string(newsessionMessage);
-    if ((int bytesSent = send(socketFD, newsessionString, getLenFromString(newsessionString), 0)) == -1) {
+    int bytesSent;
+    if ((bytesSent = send(socketFD, newsessionString, getLenFromString(newsessionString), 0)) == -1) {
         printf("Failed to send new session message.\n");
         return;
     }
 
-    //Get recv size
-    char* recvBuff[3];
-    if ((int bytesRecv = recv(socketFD, recvBuff, sizeof(recvBuff), 0)) == -1) {
-        printf("Error receiving recv buff size\n");
-        return;
-    }
-
-    //Get recv message
-    int recvSize = getLenFromString(recvBuff);
-    int bytesRecv = 0;
-    char* recvString[recvSize];
-
-    while(bytesRecv < recvSize){
-        if ((bytesRecv += recv(socketFD, &recvString[bytesRecv], sizeof(recvString) - bytesRecv, 0)) == -1) {
-            printf("Error receiving recv buff message\n");
-            return;
-        }
-    }
-
-    //Process ack
-    struct messsage recvMessage = string_to_message(recvString);
-    if (recvMessage.type == NS_ACK) {
-        printf("New session created\n");
-    }
-    else {
-        printf("Error creating new session\n");
-        return;
-    }
     
     return;
 }
 
-bool join_session(int socketFD, char* clientID, char* sessionID){
+void join_session(int socketFD, char* clientID, char* sessionID){
     //Create join session message
     struct message joinsessionMessage = {.type = JOIN, .size = strlen(sessionID)};
-    strcpy(joinsessionnMessage.source, clientID);
+    strcpy(joinsessionMessage.source, clientID);
     memcpy(joinsessionMessage.data, sessionID, strlen(sessionID));
 
     //Send join message
     char* joinsessionString = message_to_string(joinsessionMessage);
-    if ((int bytesSent = send(socketFD, joinsessionString, getLenFromString(joinsessionString), 0)) == -1) {
+    int bytesSent;
+    if ((bytesSent = send(socketFD, joinsessionString, getLenFromString(joinsessionString), 0)) == -1) {
         printf("Failed to send new session message.\n");
-        return false;
+        return;
     }
 
-    //Get recv size
-    char* recvBuff[3];
-    if ((int bytesRecv = recv(socketFD, recvBuff, sizeof(recvBuff), 0)) == -1) {
-        printf("Error receiving recv buff size\n");
-        return false;
-    }
 
-    //Get recv message
-    int recvSize = getLenFromString(recvBuff);
-    int bytesRecv = 0;
-    char* recvString[recvSize];
-
-    while(bytesRecv < recvSize){
-        if ((bytesRecv += recv(socketFD, &recvString[bytesRecv], sizeof(recvString) - bytesRecv, 0)) == -1) {
-            printf("Error receiving recv buff message\n");
-            return false;
-        }
-    }
-
-    //Process ack
-    struct messsage recvMessage = string_to_message(recvString);
-    if (recvMessage.type == JN_ACK) {
-        printf("Joined session: ");
-        for (int i = 0; i < recvMessage.size; i++) {
-            printf("%c", recvMessage.data[i]);
-        }
-        printf("\n");
-    }
-    else if (recvMessage.type == JN_NAK) {
-        for (int i = 0; i < recvMessage.size; i++) {
-            printf("%c", recvMessage.data[i]);
-        }
-        printf("\n");
-        return false;
-    }
-    else {
-        printf("Error joining session\n");
-        return false;
-    }
     
-    return true;
+    return;
 }
 
 bool leave_session(int socketFD, char* clientID){
     //Create join session message
     struct message leavesessionMessage = {.type = LEAVE_SESS, .size = 0};
-    strcpy(leavesessionnMessage.source, clientID);
+    strcpy(leavesessionMessage.source, clientID);
 
     //Send leave message
     char* leavesessionString = message_to_string(leavesessionMessage);
-    if ((int bytesSent = send(socketFD, leavesessionString, getLenFromString(leavesessionString), 0)) == -1) {
+    int bytesSent;
+    if ((bytesSent = send(socketFD, leavesessionString, getLenFromString(leavesessionString), 0)) == -1) {
         printf("Failed to send new session message.\n");
         return false;
     }
@@ -414,7 +382,8 @@ void send_message(int socketFD, char* clientID, char* message){
 
     //Send leave message
     char* sendString = message_to_string(sendMessage);
-    if ((int bytesSent = send(socketFD, sendString, getLenFromString(sendString), 0)) == -1) {
+    int bytesSent;
+    if ((bytesSent = send(socketFD, sendString, getLenFromString(sendString), 0)) == -1) {
         printf("Failed to send message.\n");
         return;
     }

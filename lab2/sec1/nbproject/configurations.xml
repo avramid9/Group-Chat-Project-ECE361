@@ -4,6 +4,7 @@
     <df root="." name="0">
       <in>client.c</in>
       <in>server.c</in>
+      <in>testing.c</in>
     </df>
     <logicalFolder name="ExternalFiles"
                    displayName="Important Files"
@@ -42,6 +43,8 @@
       <item path="client.c" ex="false" tool="0" flavor2="0">
       </item>
       <item path="server.c" ex="false" tool="0" flavor2="0">
+      </item>
+      <item path="testing.c" ex="false" tool="0" flavor2="0">
       </item>
     </conf>
   </confs>

@@ -50,7 +50,7 @@ struct message {
     unsigned char data[MAX_DATA];
 };
 
-struct client_info client_list[4];
+struct client_info client_list[5];
 int list_size = 5;
 int sesh_list_size = 11;
 
@@ -128,7 +128,7 @@ int main(int argc, char *argv[]) {
             printf("error setting up select()");
             return 0;
         }
-        char message_size [2];
+        char message_size [3];
         
         //loop through existing connections
         for(int conns=0; conns<=fdmax; conns++){
@@ -363,13 +363,13 @@ void send_login_ack(int conns, int id, struct message* m){
     strcpy(response.source,"server");
     if(id==-1){
         response.type=LO_NAK;
-        strcpy(response.data,"user");
-        response.size = 5;
+        strcpy(response.data,"User already logged in");
+        response.size = strlen(response.data);
     }
     else if(strcmp(m->data,client_list[id].password)!=0){
         response.type=LO_NAK;
-        response.size=3;
-        strcpy(response.data,"pw");
+        strcpy(response.data,"Wrong password");
+        response.size = strlen(response.data);
     }
     else{
         socklen_t len;
@@ -437,8 +437,8 @@ void new_sesh(int conns, int id, struct message* m){
     strcpy(response.source,"server");
 
     for(int i=0;i<sesh_list_size;i++){
-        if(strcmp(sesh_id_to_name[id],"")==0){
-            strcpy(sesh_id_to_name[id],m->data);
+        if(strcmp(sesh_id_to_name[i],"")==0){
+            strcpy(sesh_id_to_name[i],m->data);
             response.type = NS_ACK;           
             response.size=0;
             char* p = message_to_string(response);
@@ -455,18 +455,26 @@ void send_list(int conns, int id, struct message* m){
     strcpy(response.source,"server");
     response.type=QU_ACK;
     char list[MAX_DATA];
+    strcat(list,"Available sessions:\n");
+    for(int i=0;i<sesh_list_size;i++){
+        if(strcmp(sesh_id_to_name[i],"")==0){
+            strcat(list,sesh_id_to_name[i]);
+            strcat(list,"\n");
+        }
+    }
+    strcat(list,"\nUsers: \n");
     for(int i=0;i<list_size;i++){
         strcat(list,client_list[i].id);
-        strcat(list,"|");
+        strcat(list," --> ");
         if(strcmp(client_list[i].in_session,"none")==0)
-            strcat(list,"%");
+            strcat(list,"none");
         else
             strcat(list,client_list[i].in_session);
         if(i!=list_size-1)
-            strcat(list,"|");
+            strcat(list,"\n");
     }
     strcpy(response.data,list);
-    response.size = sizeof(list);
+    response.size = strlen(list);
     char* p = message_to_string(response);
     if(send(conns,p,getLenFromString(p),0)==-1)
         printf("error sending new sesh ack\n");
