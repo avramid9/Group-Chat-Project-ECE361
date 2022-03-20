@@ -243,16 +243,12 @@ bool login(int socketFD, char* clientID, char* password, char* serverIP, char* s
     strcpy(loginMessage.source, clientID);
     strcpy(loginMessage.data, password);
     
-    printf("%u %u %s %s\n",loginMessage.type,loginMessage.size,loginMessage.source,loginMessage.data );
+    
     //Send message
     char* loginString = message_to_string(loginMessage);
     int bytesSent;
     
-    for(int i=0;i<getLenFromString(loginString);i++){
-        printf("%c",loginString[i]);
-        
-    }
-    printf("\n");
+    
     if ((bytesSent = send(socketFD, loginString, getLenFromString(loginString), 0)) == -1) {
         printf("Failed to send login message.\n");
         fflush(stdout);
