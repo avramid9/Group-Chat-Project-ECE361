@@ -154,7 +154,7 @@ int main() {
                 }
                 if(FD_ISSET(socketFD,&readfds)){                       
                         //server sent packet, process
-                        printf("server sent stuff\n");
+                        //printf("server sent stuff\n");
 
                         //Get recv size
                         char recvBuff[3];
@@ -192,7 +192,7 @@ int main() {
                                 printf("%s: you created session\n",recvMessage.source);
                                 break;
                             case QU_ACK:
-                                printf("%s: %s",recvMessage.source,recvMessage.data);
+                                printf("%s: %s\n",recvMessage.source,recvMessage.data);
                                 break;
                             case MESSAGE:
                                 printf("%s: %s\n",recvMessage.source,recvMessage.data);
@@ -407,7 +407,7 @@ void send_message(int socketFD, char* clientID, char* message){
         return;
     }
     
-    printf("sent\n");
+    //printf("sent\n");
     return;
 }
 

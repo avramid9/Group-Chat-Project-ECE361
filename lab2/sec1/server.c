@@ -161,7 +161,7 @@ int main(int argc, char *argv[]) {
                             printf("connection closed\n");
                         //Get recv message
                         int recvSize = getLenFromString(message_size)-3;
-                        printf("%d\n",recvSize);
+                        //printf("%d\n",recvSize);
                         //int bytesRecv = 0;
                         char recvString[recvSize];
                         bytes_rec=0;
@@ -197,6 +197,7 @@ int main(int argc, char *argv[]) {
                             message_ppl(conns,id,&m);
                         else if(m.type==EXIT){
                             //logout
+                            printf("%s logged out\n",m->source);
                             client_list[id].login_status=false;
                             close(client_list[id].fd);
                             FD_CLR(client_list[id].fd,&master);
