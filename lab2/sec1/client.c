@@ -62,19 +62,20 @@ int main() {
     
     fd_set readfds;
     int num=0;
-    int socketFD = socket(AF_INET, SOCK_STREAM, 0);
+    
     
             
-    while(true){     
+    while(true){  
+        int socketFD = socket(AF_INET, SOCK_STREAM, 0);
         printf("Please login with /login <client ID> <password> <server-IP> <server-port>: ");
-        //scanf("%s %s %s %s %s",command,client_id, password, server_id, server_port); 
+        scanf("%s %s %s %s %s",command,client_id, password, server_id, server_port); 
         //strcpy(command,"/login");
         if(strcmp("/login","/login")==0){
             //scanf("%s %s %s %s", );
             //printf("%s %s %s %s %s\n",command,client_id,password, server_id, server_port);
             //fflush(stdout);
-            login_status = login(socketFD,"bob","123","128.100.13.220","5000");
-            //login_status = login(socketFD, client_id, password, server_id, server_port); //login() for login code
+            //login_status = login(socketFD,"bob","123","128.100.13.220","4000");
+            login_status = login(socketFD, client_id, password, server_id, server_port); //login() for login code
             //login_status=true;
             
             //printf("%d\n",socketFD);
@@ -96,14 +97,7 @@ int main() {
                         //printf("key pressed\n");
                         char token[MAX_DATA];
                         scanf("%s",token);
-                        //char buffer[400];
-                        //fgets(buffer,400,stdin);
-                        //buffer[strcspn(buffer, "\n")] = 0;
                         
-
-                        /* get the first token */
-                        //token = strtok(buffer, " ");
-                        printf("token got:%s",token);
                         if(strcmp(token,"/logout")==0){
                             if(in_sesh)
                                 in_sesh = leave_session(socketFD, client_id);
@@ -116,26 +110,20 @@ int main() {
                         else if(strcmp(token,"/createsession")==0){
                             char arg[100];
                             scanf(" %s",arg);
-                            printf("arg got:%s\n",arg);
-                            //token = strtok(NULL," ");
-                            //if(token==NULL)
-                                //printf("Missing id\n");
-                            //else{
-                                if(in_sesh)
-                                    leave_session(socketFD, client_id);
-                                create_session(socketFD, client_id, arg);
-                                join_session(socketFD, client_id, arg);
-                            //}
+                            
+                            if(in_sesh)
+                                leave_session(socketFD, client_id);
+                            create_session(socketFD, client_id, arg);
+                            join_session(socketFD, client_id, arg);
+                           
                         }
                         else if(strcmp(token,"/joinsession")==0){
-                            //token = strtok(NULL," ");
-                            //if(token==NULL)
-                              //  printf("Missing id\n");
-                            //else{
-                                if(in_sesh)
-                                    leave_session(socketFD, client_id);
-                                join_session(socketFD, client_id, token);
-                            //}
+                            char arg[100];
+                            scanf(" %s",arg);
+                            if(in_sesh)
+                                leave_session(socketFD, client_id);
+                            join_session(socketFD, client_id, arg);
+                            
                         }
                         else if(strcmp(token,"/leavesession")==0){
                             if(!in_sesh)
@@ -155,7 +143,11 @@ int main() {
                                 printf("please join or create session first.\n");
                             else{                    
                                 //need to change back
-                                send_message(socketFD, client_id, token);                      
+                                char msg[MAX_DATA];
+                                strcpy(msg,token);
+                                int offset = strlen(token);
+                                fgets(msg+offset,MAX_DATA-offset,stdin);
+                                send_message(socketFD, client_id, msg);                      
                             }
                         }
                         
@@ -183,30 +175,28 @@ int main() {
                                 return 0;
                             }
                         }
-                        for(int i=0;i<recvSize;i++){
-                            printf("%c",recvString[i]);
-                        }
-                        printf("\n");
+                        
                         struct message recvMessage = string_to_message(recvString);
                         //printf("test:%u %u %s %s\n",recvMessage.type,recvMessage.size,recvMessage.source,recvMessage.data);
                         char* token;
                         switch(recvMessage.type){
                             case JN_ACK:
                                 in_sesh = true;
-                                printf("%s: joined %s\n",recvMessage.source,recvMessage.data);
+                                printf("%s: you joined %s\n",recvMessage.source,recvMessage.data);
                                 break;
                             case JN_NAK:
                                 in_sesh = false;
                                 printf("%s: %s\n",recvMessage.source,recvMessage.data);
                                 break;
                             case NS_ACK:
-                                printf("created session\n");
+                                printf("%s: you created session\n",recvMessage.source);
                                 break;
                             case QU_ACK:
                                 printf("%s: %s",recvMessage.source,recvMessage.data);
                                 break;
                             case MESSAGE:
                                 printf("%s: %s\n",recvMessage.source,recvMessage.data);
+                                break;
                             default:
                                 printf("Unexpected ack type\n");
                                 break;
