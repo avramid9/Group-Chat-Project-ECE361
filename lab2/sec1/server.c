@@ -197,7 +197,7 @@ int main(int argc, char *argv[]) {
                             message_ppl(conns,id,&m);
                         else if(m.type==EXIT){
                             //logout
-                            printf("%s logged out\n",m->source);
+                            printf("%s logged out\n",m.source);
                             client_list[id].login_status=false;
                             close(client_list[id].fd);
                             FD_CLR(client_list[id].fd,&master);
