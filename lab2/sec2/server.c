@@ -25,6 +25,7 @@
 #define QU_ACK 13
 
 #define PM 14
+#define PM_NAK 18
 
 
 #define NEW 15
@@ -75,6 +76,8 @@ void send_join_ack(int conns, int id, struct message* m);
 void send_list(int conns, int id, struct message* m);
 void message_ppl(int conns, int id, struct message* m);
 void send_create_ack(int conns, struct message* m);
+void pm_ppl(int conns, int id, struct message* m);
+
 
 int main(int argc, char *argv[]) {
     //setup hardcoded client infos
@@ -202,6 +205,8 @@ int main(int argc, char *argv[]) {
                             send_list(conns,id,&m);
                         else if(m.type==MESSAGE)
                             message_ppl(conns,id,&m);
+                        else if(m.type==PM)
+                            pm_ppl(conns, id, &m);
                         else if(m.type==EXIT){
                             //logout
                             printf("%s logged out\n",m.source);
@@ -573,3 +578,64 @@ void message_ppl(int conns, int id, struct message* m){
     }
 }
 
+void pm_ppl(int conns, int id, struct message* m){
+    char* found;
+    char* recipiantID;
+    char* message;
+    char* data = strdup(m->data);
+    int n = 0;
+
+    while((found = strsep(&data, " ")) != NULL){
+        if(n==0)
+            strcpy(recipiantID, found);
+        else if(n==1)
+            strcpy(message, found);
+        n++;
+    }
+
+    //struct for PM_NAK
+    struct message pmnak = {.type = PM_NAK};
+    strcpy(pmnak.source, "server");
+
+    for(int i = 0; i < list_size; i++){
+        if(strcmp(client_list[i].id, recipiantID)==0){
+            if(client_list[i].login_status){
+                struct message pm = {.type = m->type, .size = strlen(message)+1};
+                strcpy(pm.source, m->source);
+                strcpy(pm.data, message);
+                char *p = message_to_string(pm);
+
+                int bytesSent;
+                if((bytesSent = send(client_list[i].fd,p,getLenFromString(p),0)) == -1)
+                    printf("error sending private message from %s to %s\n",m->source,recipiantID);
+                return;
+            }
+            else{
+                char* nakmessage;
+                strcat(nakmessage, recipiantID);
+                strcat(nakmessage, " is not logged in\n");
+                pmnak.size = strlen(nakmessage);
+                strcpy(pmnak.data, nakmessage);
+                char *p = message_to_string(pmnak);
+
+                int bytesSent;
+                if((bytesSent = send(conns,p,getLenFromString(p),0)) == -1)
+                    printf("error sending private message from %s to %s\n",m->source,recipiantID);
+                return;
+            }
+        }
+    }
+
+    char* nakmessage;
+    strcat(nakmessage, recipiantID);
+    strcat(nakmessage, " does not exist\n");
+    pmnak.size = strlen(nakmessage);
+    strcpy(pmnak.data, nakmessage);
+    char *p = message_to_string(pmnak);
+
+    int bytesSent;
+    if((bytesSent = send(conns,p,getLenFromString(p),0)) == -1)
+        printf("error sending private message from %s to %s\n",m->source,client_list[id].id);
+
+    return;
+}

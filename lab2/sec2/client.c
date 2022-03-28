@@ -27,6 +27,8 @@
 #define NEW 15
 #define NEW_ACK 16
 #define NEW_NAK 17
+#define PM_NAK 18
+
 
 #define MAX_NAME 100
 #define MAX_DATA 1000
@@ -211,6 +213,9 @@ int main() {
                                 break;
                             case PM:
                                 printf("PM from %s: %s\n", recvMessage.source, recvMessage.data);
+                                break;
+                            case PM_NAK:
+                                printf("%s\n");
                                 break;
                             default:
                                 printf("Unexpected ack type\n");
@@ -430,9 +435,11 @@ void send_message(int socketFD, char* clientID, char* message){
 
 void send_pm(int socketFD, char* clientID, char* recipiantID, char* message){
     //Create pm message
-    struct message sendMessage = {.type = PM, .size = strlen(message)+1};
+    struct message sendMessage = {.type = PM, .size = strlen(message)+strlen(recipiantID)+2};
     strcpy(sendMessage.source, clientID);
-    strcpy(sendMessage.data, message);
+    strcat(sendMessage.data, recipiantID);
+    strcat(sendMessage.data, " ");
+    strcat(sendMessage.data, message);
 
     //Send pm
     char* sendString = message_to_string(sendMessage);
