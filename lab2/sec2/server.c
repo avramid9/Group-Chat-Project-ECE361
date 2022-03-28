@@ -23,7 +23,13 @@
 #define MESSAGE 11
 #define QUERY 12
 #define QU_ACK 13
+
 #define PM 14
+
+
+#define NEW 15
+#define NEW_ACK 16
+#define NEW_NAK 17
 
 #define MAX_NAME 100
 #define MAX_DATA 1000
@@ -50,8 +56,8 @@ struct message {
     unsigned char data[MAX_DATA];
 };
 
-struct client_info client_list[5];
-int list_size = 5;
+struct client_info client_list[25];
+int list_size = 0;
 int sesh_list_size = 20;
 
 void initialize_client_list();
@@ -68,7 +74,7 @@ void new_sesh(int conns, int id, struct message* m);
 void send_join_ack(int conns, int id, struct message* m);
 void send_list(int conns, int id, struct message* m);
 void message_ppl(int conns, int id, struct message* m);
-
+void send_create_ack(int conns, struct message* m);
 
 int main(int argc, char *argv[]) {
     //setup hardcoded client infos
@@ -206,6 +212,9 @@ int main(int argc, char *argv[]) {
                             client_list[id].port=-1;
                             memset(&client_list[id].ip[0],0,sizeof(client_list[id].ip));
                         }
+                        else if(m.type==NEW){
+                            send_create_ack(conns,&m);
+                        }
                             
                     }
                 }
@@ -217,36 +226,19 @@ int main(int argc, char *argv[]) {
 }
 
 void initialize_client_list(){
-    
-    strcpy(client_list[0].id,"bob");
-    strcpy(client_list[0].password,"123");
-    strcpy(client_list[0].in_session,"none");
-    client_list[0].login_status=false;
-    client_list[0].fd=-1;
-    
-    strcpy(client_list[1].id,"john");
-    strcpy(client_list[1].password,"123");
-    strcpy(client_list[1].in_session,"none");
-    client_list[1].login_status=false;
-    client_list[1].fd=-1;
-    
-    strcpy(client_list[2].id,"steve");
-    strcpy(client_list[2].password,"123");
-    strcpy(client_list[2].in_session,"none");
-    client_list[2].login_status=false;
-    client_list[2].fd=-1;
-    
-    strcpy(client_list[3].id,"harold");
-    strcpy(client_list[3].password,"123");
-    strcpy(client_list[3].in_session,"none");
-    client_list[3].login_status=false;
-    client_list[3].fd=-1;
-    
-    strcpy(client_list[4].id,"johnson");
-    strcpy(client_list[4].password,"123");
-    strcpy(client_list[4].in_session,"none");
-    client_list[4].login_status=false;
-    client_list[4].fd=-1;
+    FILE* fp;
+    fp = fopen("user.txt","r");
+    char user [25];
+    char pw [25];
+    while(fscanf(fp," %s %s",user,pw)==2){
+        strcpy(client_list[list_size].id,user);
+        strcpy(client_list[list_size].password,pw);
+        strcpy(client_list[list_size].in_session,"none");
+        client_list[list_size].login_status=false;
+        client_list[list_size].fd=-1;
+        list_size++;
+    }
+    fclose(fp);
     return;
 }
 
@@ -375,7 +367,39 @@ struct message string_to_message(char* s) {
 int getLenFromString(char* s) {
     return (int)((s[1] << 8) + s[0]);
 }
-
+void send_create_ack(int conns, struct message* m){
+    struct message response;
+    char user [25];
+    char pw [25];
+    FILE* fp;
+    
+    strcpy(response.source,"server");    
+    for(int i=0;i<list_size;i++){
+        if(strcmp(client_list[i].id,m->source)==0){
+            response.type = NEW_NAK;
+            strcpy(response.data,"Username already exists");
+            response.size = strlen(response.data)+1;
+            char* p = message_to_string(response);
+            int bytesSent;
+            if((bytesSent = send(conns,p,getLenFromString(p),0))==-1)
+                printf("error sending create nak\n");
+            printf("attempted to create existing username");
+            return;
+        }
+    }
+    fp = fopen("user.txt","a");
+    fprintf(fp," %s %s",m->source,m->data);
+    fclose(fp);
+    initialize_client_list();
+    response.type = NEW_ACK;
+    response.size = 0;
+    char* p = message_to_string(response);
+    int bytesSent;
+    if((bytesSent = send(conns,p,getLenFromString(p),0))==-1)
+        printf("error sending create ack\n");
+    printf("new user created with %s %s\n",m->source,m->data);
+    return;
+}
 void send_login_ack(int conns, int id, struct message* m){
     //printf("respond login\n");
     struct message response;

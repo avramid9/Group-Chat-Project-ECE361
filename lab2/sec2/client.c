@@ -24,7 +24,9 @@
 #define QUERY 12
 #define QU_ACK 13
 #define PM 14
-
+#define NEW 15
+#define NEW_ACK 16
+#define NEW_NAK 17
 
 #define MAX_NAME 100
 #define MAX_DATA 1000
@@ -44,6 +46,7 @@ void join_session(int socketFD, char* clientID, char* sessionID);
 bool leave_session(int socketFD, char* clientID);
 void send_message(int socketFD, char* clientID, char* message);
 void send_pm(int socketFD, char* clientID, char* recipiantID, char* message);
+void create(int socketFD, char* clientID, char* password, char* serverIP, char* serverPort);
 char* message_to_string(struct message m);
 struct message string_to_message(char* s);
 int getLenFromString(char* s);
@@ -69,18 +72,13 @@ int main() {
             
     while(true){  
         int socketFD = socket(AF_INET, SOCK_STREAM, 0);
-        printf("Please login with /login <client ID> <password> <server-IP> <server-port>: ");
-        scanf("%s %s %s %s %s",command,client_id, password, server_id, server_port); 
+        printf("Please login with /login <client ID> <password> <server-IP> <server-port>\n");
+        printf("or create account with /create <client ID> <password> <server-IP> <server-port>\n");
+        scanf("%s",command); 
         //strcpy(command,"/login");
-        if(strcmp("/login","/login")==0){
-            //scanf("%s %s %s %s", );
-            //printf("%s %s %s %s %s\n",command,client_id,password, server_id, server_port);
-            //fflush(stdout);
-            //login_status = login(socketFD,"bob","123","128.100.13.220","4000");
+        if(strcmp("/login",command)==0){
+            scanf(" %s %s %s %s",client_id, password, server_id, server_port);            
             login_status = login(socketFD, client_id, password, server_id, server_port); //login() for login code
-            //login_status=true;
-            
-            //printf("%d\n",socketFD);
             
             while (login_status){
                 //printf("before select\n");
@@ -145,6 +143,12 @@ int main() {
                             char arg2[100];
                             scanf(" %s %s", arg1, arg2);
                             send_pm(socketFD, client_id, arg1, arg2);
+                        }
+                        else if(strcmp(token,"/create")==0){
+                            char arg[100];
+                            char arg2[100];
+                            scanf(" %s %s",arg,arg2);
+                            printf("Please logout first.\n");
                         }
                         else{ //text
                             if(!in_sesh)
@@ -219,6 +223,12 @@ int main() {
                 
                       
             }
+        }
+        else if(strcmp(command,"/create")==0){
+            scanf(" %s %s %s %s",client_id, password, server_id, server_port);
+            int tempFD = socket(AF_INET, SOCK_STREAM, 0);
+            create(tempFD, client_id, password, server_id, server_port);
+            
         }
         else if(strcmp(command,"/quit")==0){
             printf("Quitting client.\n");
@@ -543,4 +553,73 @@ struct message string_to_message(char* s) {
 
 int getLenFromString(char* s) {
     return (int)((s[1] << 8) + s[0]);
+}
+
+void create(int socketFD, char* clientID, char* password, char* serverIP, char* serverPort){
+    //Put server information into sockaddr_in
+    struct sockaddr_in sa;
+    memset(&sa.sin_zero, 0, 8*sizeof(unsigned char));
+    sa.sin_family = AF_INET;
+    sa.sin_port = htons(atoi(serverPort));
+    inet_pton(AF_INET, serverIP, &(sa.sin_addr));
+    
+    int err = connect(socketFD, (const struct sockaddr*)&sa, (socklen_t) sizeof(sa));
+    if(err) {
+        printf("Connection to server failed.\n");
+        return;
+    }
+    //printf("connected\n");
+    //fflush(stdout);
+    //Create message
+    strcpy(client_id,clientID);
+    struct message loginMessage = {.type = NEW, .size = strlen(password)+1};
+    strcpy(loginMessage.source, clientID);
+    strcpy(loginMessage.data, password);
+    
+    
+    //Send message
+    char* loginString = message_to_string(loginMessage);
+    int bytesSent;
+    
+    
+    if ((bytesSent = send(socketFD, loginString, getLenFromString(loginString), 0)) == -1) {
+        printf("Failed to send login message.\n");
+        fflush(stdout);
+        return;
+    }
+
+    //Get recv size
+    char recvBuff[3];
+    int bytesRecv;
+    if ((bytesRecv = recv(socketFD, recvBuff, sizeof(recvBuff), 0)) == -1) {
+        printf("Error receiving recv buff size\n");
+        fflush(stdout);
+        return;
+    }
+
+    //Get recv message
+    int recvSize = getLenFromString(recvBuff)-3;
+    //int bytesRecv = 0;
+    char recvString[recvSize];
+    bytesRecv=0;
+    while(bytesRecv < recvSize){
+        if ((bytesRecv += recv(socketFD, recvString+bytesRecv, recvSize - bytesRecv, 0)) == -1) {
+            printf("Error receiving recv buff message\n");
+            fflush(stdout);
+            return;
+        }
+    }
+
+    //Process ack
+    struct message recvMessage = string_to_message(recvString);
+    if (recvMessage.type == NEW_ACK) {
+        printf("Account created!\n");       
+    }
+    else if (recvMessage.type == NEW_NAK){
+        printf("%s\n",recvMessage.data);
+    }
+    else {
+        printf("Error getting create ack.\n");
+    }
+    return;
 }

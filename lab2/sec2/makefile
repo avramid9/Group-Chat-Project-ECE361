@@ -1,7 +1,6 @@
 CC=gcc
-all: server client testing
+all: server client 
 server: server.o
 client: client.o
-testing: testing.o
 clean:
 	rm -f *.o server client testing
