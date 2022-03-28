@@ -23,6 +23,7 @@
 #define MESSAGE 11
 #define QUERY 12
 #define QU_ACK 13
+#define PM 14
 
 
 #define MAX_NAME 100
@@ -42,6 +43,7 @@ void create_session(int socketFD, char* clientID, char* sessionID);
 void join_session(int socketFD, char* clientID, char* sessionID);
 bool leave_session(int socketFD, char* clientID);
 void send_message(int socketFD, char* clientID, char* message);
+void send_pm(int socketFD, char* clientID, char* recipiantID, char* message);
 char* message_to_string(struct message m);
 struct message string_to_message(char* s);
 int getLenFromString(char* s);
@@ -138,6 +140,12 @@ int main() {
                             printf("Quitting client.\n");
                             return 0;
                         }
+                        else if(strcmp(token, "/pm")==0){
+                            char arg1[100];
+                            char arg2[100];
+                            scanf(" %s %s", arg1, arg2);
+                            send_pm(socketFD, client_id, arg1, arg2);
+                        }
                         else{ //text
                             if(!in_sesh)
                                 printf("please join or create session first.\n");
@@ -196,6 +204,9 @@ int main() {
                                 break;
                             case MESSAGE:
                                 printf("%s: %s\n",recvMessage.source,recvMessage.data);
+                                break;
+                            case PM:
+                                printf("PM from %s: %s\n", recvMessage.source, recvMessage.data);
                                 break;
                             default:
                                 printf("Unexpected ack type\n");
@@ -395,7 +406,7 @@ void send_message(int socketFD, char* clientID, char* message){
     strcpy(sendMessage.source, clientID);
     strcpy(sendMessage.data, message);
 
-    //Send leave message
+    //Send message
     char* sendString = message_to_string(sendMessage);
     int bytesSent;
     if ((bytesSent = send(socketFD, sendString, getLenFromString(sendString), 0)) == -1) {
@@ -407,6 +418,22 @@ void send_message(int socketFD, char* clientID, char* message){
     return;
 }
 
+void send_pm(int socketFD, char* clientID, char* recipiantID, char* message){
+    //Create pm message
+    struct message sendMessage = {.type = PM, .size = strlen(message)+1};
+    strcpy(sendMessage.source, clientID);
+    strcpy(sendMessage.data, message);
+
+    //Send pm
+    char* sendString = message_to_string(sendMessage);
+    int bytesSent;
+    if ((bytesSent = send(socketFD, sendString, getLenFromString(sendString), 0)) == -1) {
+        printf("Failed to send message.\n");
+        return;
+    }
+    
+    return;
+}
 
 char* message_to_string(struct message m) {
     //Get strings and their length from first 2 fields in packet
