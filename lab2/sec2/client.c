@@ -211,11 +211,8 @@ int main() {
                             case MESSAGE:
                                 printf("%s: %s\n",recvMessage.source,recvMessage.data);
                                 break;
-                            case PM:
-                                printf("PM from %s: %s\n", recvMessage.source, recvMessage.data);
-                                break;
                             case PM_NAK:
-                                printf("%s\n");
+                                printf("%s\n", recvMessage.data);
                                 break;
                             default:
                                 printf("Unexpected ack type\n");
@@ -440,7 +437,7 @@ void send_pm(int socketFD, char* clientID, char* recipiantID, char* message){
     strcat(sendMessage.data, recipiantID);
     strcat(sendMessage.data, " ");
     strcat(sendMessage.data, message);
-
+    
     //Send pm
     char* sendString = message_to_string(sendMessage);
     int bytesSent;

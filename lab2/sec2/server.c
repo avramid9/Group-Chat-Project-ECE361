@@ -579,30 +579,30 @@ void message_ppl(int conns, int id, struct message* m){
 }
 
 void pm_ppl(int conns, int id, struct message* m){
-    char* found;
-    char* recipiantID;
-    char* message;
+    char sender_id[100];
+    strcpy(sender_id, m->source);
+    
+    //char found[1000];
+    char* recipiantID = malloc(100);
+    char* message = malloc(1000);
     char* data = strdup(m->data);
-    int n = 0;
-
-    while((found = strsep(&data, " ")) != NULL){
-        if(n==0)
-            strcpy(recipiantID, found);
-        else if(n==1)
-            strcpy(message, found);
-        n++;
-    }
-
+    
+    recipiantID = strsep(&data, " ");
+    message = strsep(&data, " ");
+    
     //struct for PM_NAK
     struct message pmnak = {.type = PM_NAK};
     strcpy(pmnak.source, "server");
 
     for(int i = 0; i < list_size; i++){
+        printf("i: %d\n", i);
+        printf("clientid: %s\n", client_list[i].id);
         if(strcmp(client_list[i].id, recipiantID)==0){
-            if(client_list[i].login_status){
-                struct message pm = {.type = m->type, .size = strlen(message)+1};
-                strcpy(pm.source, m->source);
+            if(client_list[i].login_status == true){
+                struct message pm = {.type = MESSAGE, .size = strlen(message)+1};
+                strcpy(pm.source, sender_id);
                 strcpy(pm.data, message);
+                
                 char *p = message_to_string(pm);
 
                 int bytesSent;
@@ -611,13 +611,13 @@ void pm_ppl(int conns, int id, struct message* m){
                 return;
             }
             else{
-                char* nakmessage;
+                char* nakmessage = malloc(1000);
                 strcat(nakmessage, recipiantID);
                 strcat(nakmessage, " is not logged in\n");
                 pmnak.size = strlen(nakmessage);
                 strcpy(pmnak.data, nakmessage);
                 char *p = message_to_string(pmnak);
-
+                
                 int bytesSent;
                 if((bytesSent = send(conns,p,getLenFromString(p),0)) == -1)
                     printf("error sending private message from %s to %s\n",m->source,recipiantID);
@@ -626,7 +626,7 @@ void pm_ppl(int conns, int id, struct message* m){
         }
     }
 
-    char* nakmessage;
+    char* nakmessage = malloc(1000);
     strcat(nakmessage, recipiantID);
     strcat(nakmessage, " does not exist\n");
     pmnak.size = strlen(nakmessage);
