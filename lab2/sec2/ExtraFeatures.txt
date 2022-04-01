@@ -1,0 +1,22 @@
+------------------Private Messaging------------------
+The input for private messaging is of the form:
+
+/pm <clientid> <text>
+
+where <clientid> is the cientid of the person you want to send the private message to and <text> is the message you want to send.
+
+This was implemented by creating two new message types, private message and private message nack.
+Private message has type PM and contains the recipiant id and the text message, seperated by a space, in the data field.
+Private message nack has type PM_NAK which contains the error message in the data field depending on what type of error has occured.
+
+Type        Packet Data
+PM          <recipiantID, message data>
+PM_NAK      <reason for failiure>
+
+
+The client will send a message of type PM when a user tries to send a private message. If no error occurs on the server,
+the server will send a mesage of type MESSAGE to the intended client. If there is an error, then the server will send a message
+of type PM_NAK back to the client who sent the private message with an error message for the client to print to the user.
+
+
+------------------User Registration------------------
