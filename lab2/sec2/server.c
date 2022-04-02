@@ -584,19 +584,20 @@ void pm_ppl(int conns, int id, struct message* m){
     
     //char found[1000];
     char* recipiantID = malloc(100);
-    char* message = malloc(1000);
+    char* message = malloc(MAX_DATA);
     char* data = strdup(m->data);
     
     recipiantID = strsep(&data, " ");
-    message = strsep(&data, " ");
+    strcpy(message,data);
+    
     
     //struct for PM_NAK
     struct message pmnak = {.type = PM_NAK};
     strcpy(pmnak.source, "server");
 
     for(int i = 0; i < list_size; i++){
-        printf("i: %d\n", i);
-        printf("clientid: %s\n", client_list[i].id);
+        //printf("i: %d\n", i);
+        //printf("clientid: %s\n", client_list[i].id);
         if(strcmp(client_list[i].id, recipiantID)==0){
             if(client_list[i].login_status == true){
                 struct message pm = {.type = MESSAGE, .size = strlen(message)+1};

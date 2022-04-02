@@ -142,8 +142,9 @@ int main() {
                         }
                         else if(strcmp(token, "/pm")==0){
                             char arg1[100];
-                            char arg2[100];
-                            scanf(" %s %s", arg1, arg2);
+                            char arg2[MAX_DATA];
+                            scanf(" %s ", arg1);
+                            fgets(arg2,MAX_DATA,stdin);
                             send_pm(socketFD, client_id, arg1, arg2);
                         }
                         else if(strcmp(token,"/create")==0){
