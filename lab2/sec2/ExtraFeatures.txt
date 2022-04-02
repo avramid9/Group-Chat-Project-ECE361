@@ -24,7 +24,10 @@ The input for creating new user if os the form:
 
 /create <clientid> <password> <server-ip> <server port>
 
-This function can only be called before logging in. If user is already logged in, this function will prompt them to log out first. This was implemented by creating a NEW packet that contains the new username and password that you want to create. Once successful, it will say account created, in which the user can then attempt to login with their new account. Server then sends back type NEW_ACK if username and passwords are valid, or NEW_NAK if the username is already taken.
+This function can only be called before logging in. If user is already logged in, this function will prompt them to log out first. 
+This was implemented by creating a NEW packet that contains the new username and password that you want to create. Once successful, 
+it will say account created, in which the user can then attempt to login with their new account. 
+Server then sends back type NEW_ACK if username and passwords are valid, or NEW_NAK if the username is already taken.
 
 Type         Packet Data
 NEW          <password>
